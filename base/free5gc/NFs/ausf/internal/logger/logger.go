@@ -20,6 +20,7 @@ var (
 	Auth5gAkaLog *logrus.Entry
 	AuthELog     *logrus.Entry
 	UtilLog      *logrus.Entry
+	AppLog       *logrus.Entry
 )
 
 func init() {
@@ -41,4 +42,5 @@ func init() {
 	Auth5gAkaLog = NfLog.WithField(logger_util.FieldCategory, "5gAka")
 	AuthELog = NfLog.WithField(logger_util.FieldCategory, "Eap")
 	UtilLog = NfLog.WithField(logger_util.FieldCategory, "Util")
+	AppLog = NfLog.WithField(logger_util.FieldCategory, "AppLog")
 }

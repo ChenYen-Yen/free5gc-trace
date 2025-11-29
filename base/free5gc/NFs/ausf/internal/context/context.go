@@ -47,6 +47,9 @@ type AusfUeContext struct {
 	Rand     string
 	EapID    uint8
 	Resynced bool
+
+	//add
+	TraceContext context.Context
 }
 
 type SuciSupiMap struct {

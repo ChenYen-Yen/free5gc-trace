@@ -9,7 +9,17 @@ import (
 	"github.com/free5gc/openapi/models"
 	Nudm_UEAU "github.com/free5gc/openapi/udm/UEAuthentication"
 	sbi_metrics "github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"context"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
+
+// add
+var udmTracer = otel.Tracer("ausf-sbi")
 
 type nudmService struct {
 	consumer *Consumer
@@ -43,11 +53,12 @@ func (s *nudmService) getUdmUeauClient(uri string) *Nudm_UEAU.APIClient {
 }
 
 func (s *nudmService) SendAuthResultToUDM(
+	baseCtx context.Context, //add
 	id string,
 	authType models.UdmUeauAuthType,
 	success bool,
 	servingNetworkName, udmUrl string,
-) error {
+) (error, context.Context) {
 	timeNow := time.Now()
 	timePtr := &timeNow
 
@@ -65,33 +76,62 @@ func (s *nudmService) SendAuthResultToUDM(
 
 	ctx, _, err := ausf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_UEAU, models.NrfNfManagementNfType_UDM)
 	if err != nil {
-		return err
+		return err, nil
 	}
+
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	spanCtx, span := udmTracer.Start(baseCtx, "AUSF → UDM: SendAuthResultToUDM")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ausf.id", id),
+		attribute.String("udm.url", udmUrl),
+	)
+	defer span.End()
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 
 	request := &Nudm_UEAU.ConfirmAuthRequest{
 		Supi:      &id,        // Make sure this is correctly referenced
 		AuthEvent: &authEvent, // Make sure this is correctly referenced
 	}
 
-	_, confirmAuthErr := client.ConfirmAuthApi.ConfirmAuth(ctx, request)
+	//add
+	// _, confirmAuthErr := client.ConfirmAuthApi.ConfirmAuth(ctx, request)
+	_, confirmAuthErr := client.ConfirmAuthApi.ConfirmAuth(ctxForHTTP, request)
 	if confirmAuthErr != nil {
 		logger.ConsumerLog.Errorf("Error in ConfirmAuth: %v", confirmAuthErr)
 	}
 
-	return confirmAuthErr
+	return confirmAuthErr, spanCtx
 }
 
 func (s *nudmService) GenerateAuthDataApi(
+	baseCtx context.Context, //add
 	udmUrl string,
 	supiOrSuci string,
 	authInfoReq models.AuthenticationInfoRequest,
-) (*models.UdmUeauAuthenticationInfoResult, *models.ProblemDetails, error) {
+) (*models.UdmUeauAuthenticationInfoResult, *models.ProblemDetails, error, context.Context) {
 	client := s.getUdmUeauClient(udmUrl)
 
 	ctx, pd, err := ausf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_UEAU, models.NrfNfManagementNfType_UDM)
 	if err != nil {
-		return nil, pd, err
+		return nil, pd, err, nil
 	}
+
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	spanCtx, span := udmTracer.Start(baseCtx, "AUSF → UDM: GenerateAuthData")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ausf.supi_or_suci", supiOrSuci),
+		attribute.String("udm.url", udmUrl),
+	)
+	defer span.End()
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 
 	udmAuthInfoReq := models.UdmUeauAuthenticationInfoRequest{
 		SupportedFeatures:     authInfoReq.SupportedFeatures,
@@ -107,7 +147,9 @@ func (s *nudmService) GenerateAuthDataApi(
 		UdmUeauAuthenticationInfoRequest: &udmAuthInfoReq,
 	}
 
-	rsp, err := client.GenerateAuthDataApi.GenerateAuthData(ctx, request)
+	//add
+	// rsp, err := client.GenerateAuthDataApi.GenerateAuthData(ctx, request)
+	rsp, err := client.GenerateAuthDataApi.GenerateAuthData(ctxForHTTP, request)
 	if err != nil {
 		var problemDetails models.ProblemDetails
 		if rsp == nil {
@@ -117,9 +159,13 @@ func (s *nudmService) GenerateAuthDataApi(
 		} else {
 			problemDetails.Cause = "UPSTREAM_SERVER_ERROR"
 		}
-		return nil, &problemDetails, err
+		return nil, &problemDetails, err, nil
 	}
 	authInfoResult := rsp.UdmUeauAuthenticationInfoResult
 
-	return &authInfoResult, nil, nil
+	span.SetAttributes(
+		attribute.String("udm.auth_type", string(authInfoResult.AuthType)),
+	)
+
+	return &authInfoResult, nil, nil, spanCtx
 }
