@@ -16,6 +16,11 @@ import (
 	Nnrf_NFDiscovery "github.com/free5gc/openapi/nrf/NFDiscovery"
 	Nnrf_NFManagement "github.com/free5gc/openapi/nrf/NFManagement"
 	sbi_metrics "github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type nnrfService struct {
@@ -85,11 +90,27 @@ func (s *nnrfService) SendSearchNFInstances(nrfUri string, targetNfType, request
 		return nil, openapi.ReportError("nrf not found")
 	}
 
+	//add
+	baseCtx := context.Background()
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NNRF_DISC, models.NrfNfManagementNfType_NRF)
 	if err != nil {
 		return nil, err
 	}
-	res, err := client.NFInstancesStoreApi.SearchNFInstances(ctx, param)
+
+	// add: 在已附帶 token 的 ctx 上開一個 SBI span
+	tracer := otel.Tracer("amf-sbi")
+	_, span := tracer.Start(baseCtx, "AMF → NRF: SendSearchNFInstances")
+	span.SetAttributes(
+		attribute.String("target.nf", "NRF"),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
+	//add
+	// res, err := client.NFInstancesStoreApi.SearchNFInstances(ctx, param)
+	res, err := client.NFInstancesStoreApi.SearchNFInstances(ctxForHTTP, param)
 	var result *models.SearchResult
 	if err != nil {
 		logger.ConsumerLog.Errorf("SearchNFInstances failed: %+v", err)
@@ -315,16 +336,30 @@ func (s *nnrfService) SendDeregisterNFInstance() (problemDetails *models.Problem
 		return nil, openapi.ReportError("nrf not found")
 	}
 
+	//add
+	baseCtx := context.Background()
+	// amfSelf := amf_context.GetSelf()
+
 	ctx, pd, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NNRF_NFM, models.NrfNfManagementNfType_NRF)
 	if err != nil {
 		return pd, err
 	}
 
+	tracer := otel.Tracer("amf-sbi")
+	_, span := tracer.Start(baseCtx, "AMF → NRF: SendDeregisterNFInstance")
+	span.SetAttributes(
+		attribute.String("target.nf", "NRF"),
+	)
+	defer span.End()
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	request := &Nnrf_NFManagement.DeregisterNFInstanceRequest{
 		NfInstanceID: &amfContext.NfId,
 	}
 
-	_, err = client.NFInstanceIDDocumentApi.DeregisterNFInstance(ctx, request)
+	//add
+	// _, err = client.NFInstanceIDDocumentApi.DeregisterNFInstance(ctx, request)
+	_, err = client.NFInstanceIDDocumentApi.DeregisterNFInstance(ctxForHTTP, request)
 	if err != nil {
 		switch apiErr := err.(type) {
 		// API error

@@ -3,15 +3,25 @@ package nas
 import (
 	"fmt"
 
+	//add
+	stdctx "context"
+
 	amf_context "github.com/free5gc/amf/internal/context"
 	gmm_common "github.com/free5gc/amf/internal/gmm/common"
 	"github.com/free5gc/amf/internal/logger"
 	"github.com/free5gc/amf/internal/nas/nas_security"
 	"github.com/free5gc/nas"
 	nas_metrics "github.com/free5gc/util/metrics/nas"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func HandleNAS(ranUe *amf_context.RanUe, procedureCode int64, nasPdu []byte, initialMessage bool) {
+	//add
+	fmt.Println("===== HANDLE NAS TRACER TEST =====")
+
 	isNasMsgRcv := false
 	metricCause := ""
 	nasMsg := nas.NewMessage()
@@ -65,6 +75,53 @@ func HandleNAS(ranUe *amf_context.RanUe, procedureCode int64, nasPdu []byte, ini
 		gmm_common.ClearHoldingRanUe(ranUe.HoldingAmfUe.RanUe[ranUe.Ran.AnType])
 		ranUe.HoldingAmfUe = nil
 	}
+
+	//add
+	var ctx stdctx.Context
+	if ranUe.TraceContext != nil {
+		ctx = ranUe.TraceContext
+	} else if ranUe.AmfUe.TraceContext != nil {
+		ctx = ranUe.AmfUe.TraceContext
+	} else {
+		ctx = stdctx.Background()
+	}
+
+	tracer := otel.Tracer("amf-n1")
+	ctx, span := tracer.Start(ctx, "N1 HandleNAS")
+	defer span.End()
+
+	// 把更新後的 ctx 存回 UE，讓後面 GMM / SBI 可以沿用
+	ranUe.AmfUe.TraceContext = ctx
+	ranUe.TraceContext = ctx
+
+	// UE 層級資訊
+	if ranUe.AmfUe != nil {
+		span.SetAttributes(
+			attribute.String("ue.id", ranUe.AmfUe.Info()),
+			attribute.String("ue.supi", ranUe.AmfUe.Supi),
+		)
+	}
+
+	// NAS / N2 相關屬性
+	span.SetAttributes(
+		attribute.Int64("n2.procedureCode", procedureCode),
+		attribute.Bool("nas.initialMessage", initialMessage),
+		attribute.Bool("nas.integrityProtected", integrityProtected),
+	)
+
+	if msg.GmmMessage != nil {
+		span.SetAttributes(
+			attribute.String("nas.msg_class", "GMM"),
+			attribute.Int("nas.gmm_msg_type", int(msg.GmmMessage.GmmHeader.GetMessageType())),
+		)
+	} else {
+		span.SetAttributes(
+			attribute.String("nas.msg_class", "non-GMM"),
+		)
+	}
+
+	spanCtx := span.SpanContext()
+	ranUe.AmfUe.NASLog.Infof("N1 span traceID=%s", spanCtx.TraceID().String())
 
 	isNasMsgRcv = true
 

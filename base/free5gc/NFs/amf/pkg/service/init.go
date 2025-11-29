@@ -7,6 +7,9 @@ import (
 	"runtime/debug"
 	"sync"
 
+	// add
+	//"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
@@ -25,6 +28,17 @@ import (
 	"github.com/free5gc/openapi/models"
 	"github.com/free5gc/util/metrics"
 	"github.com/free5gc/util/metrics/utils"
+
+	//add
+	"go.opentelemetry.io/otel"
+	//"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	//"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	//"google.golang.org/grpc"
 )
 
 type AmfAppInterface interface {
@@ -186,6 +200,35 @@ func (a *AmfApp) SetReportCaller(reportCaller bool) {
 }
 
 func (a *AmfApp) Start() {
+	//add
+	// tp, err := InitOTel()
+	// if err != nil {
+	// 	logger.AppLog.Warnf("Failed to init OTel: %+v", err)
+	// } else {
+	// 	logger.AppLog.Infof("OpenTelemetry initialized successfully")
+	// 	// 建議：在程式結束前優雅關閉
+	// 	defer func() {
+	// 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// 		defer cancel()
+	// 		if err := tp.Shutdown(ctx); err != nil {
+	// 			logger.AppLog.Warnf("Error shutting down OTel: %+v", err)
+	// 		}
+	// 	}()
+	// }
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tp, err := initTracerProvider(ctx, "amf")
+	if err != nil {
+		logger.AppLog.Warnf("Failed to init Console: %+v", err)
+		// 視情況 log.Fatal 或回傳 error
+		return
+	}
+	defer func() {
+		_ = tp.Shutdown(ctx) // 確保 buffer 裡的 span 有 flush 出去（這裡是寫到 stdout）
+	}()
+
 	self := a.Context()
 	amf_context.InitAmfContext(self)
 
@@ -306,4 +349,94 @@ func (a *AmfApp) terminateProcedure() {
 	})
 	ngap_service.Stop()
 	callback.SendAmfStatusChangeNotify((string)(models.StatusChange_UNAVAILABLE), amfSelf.ServedGuamiList)
+}
+
+// func InitOTel() (*trace.TracerProvider, error) {
+// 	ctx := context.Background()
+
+// 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+// 	if endpoint == "" {
+// 		endpoint = "otel-collector.default.svc.cluster.local:4317"
+// 	}
+
+// 	exporter, err := otlptracegrpc.New(
+// 		ctx,
+// 		otlptracegrpc.WithEndpoint(endpoint),
+// 		otlptracegrpc.WithInsecure(),
+// 		otlptracegrpc.WithDialOption(grpc.WithBlock()),
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	res, err := resource.New(ctx,
+// 		resource.WithAttributes(
+// 			semconv.ServiceName("amf"),
+// 			semconv.ServiceVersion("free5gc-3.4"),
+// 		),
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	tp := trace.NewTracerProvider(
+// 		trace.WithBatcher(exporter),
+// 		trace.WithResource(res),
+// 	)
+
+// 	otel.SetTracerProvider(tp)
+// 	otel.SetTextMapPropagator(
+// 		propagation.NewCompositeTextMapPropagator(
+// 			propagation.TraceContext{},
+// 			propagation.Baggage{},
+// 		),
+// 	)
+
+// 	return tp, nil
+// }
+
+func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.TracerProvider, error) {
+	// 1. 建立 console trace exporter（輸出到 stdout）
+	exporter, err := stdouttrace.New(
+		stdouttrace.WithPrettyPrint(),     // 輸出成比較好讀的 JSON
+		stdouttrace.WithWriter(os.Stdout), // 預設就是 Stdout，其實可省略
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. 設定 Resource（service.name 很重要）
+	res, err := resource.New(
+		ctx,
+		resource.WithFromEnv(),
+		resource.WithProcess(),
+		resource.WithTelemetrySDK(),
+		resource.WithHost(),
+		resource.WithAttributes(
+			semconv.ServiceName(serviceName),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. 建立 TracerProvider
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+
+	// 4. 設為 global
+	otel.SetTracerProvider(tp)
+	// 如有需要，這裡也可以設定 Propagator（例如 W3C TraceContext）
+	// otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		),
+	)
+
+	return tp, nil
 }

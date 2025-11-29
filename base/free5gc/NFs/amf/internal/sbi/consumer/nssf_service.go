@@ -3,11 +3,19 @@ package consumer
 import (
 	"sync"
 
+	//add
+	"context"
+
 	amf_context "github.com/free5gc/amf/internal/context"
 	"github.com/free5gc/openapi"
 	"github.com/free5gc/openapi/models"
 	Nnssf_NSSelection "github.com/free5gc/openapi/nssf/NSSelection"
 	sbi_metrics "github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type nssfService struct {
@@ -50,11 +58,30 @@ func (s *nssfService) NSSelectionGetForRegistration(ue *amf_context.AmfUe, reque
 	}
 
 	amfSelf := amf_context.GetSelf()
+
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NNSSF_NSSELECTION,
 		models.NrfNfManagementNfType_NSSF)
 	if err != nil {
 		return nil, err
 	}
+
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → NSSF: NSSelectionGetForRegistration")
+	span.SetAttributes(
+		attribute.String("target.nf", "NSSF"),
+		attribute.String("ue.supi", ue.Supi),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
+
 	sliceInfo := models.SliceInfoForRegistration{
 		SubscribedNssai: ue.SubscribedNssai,
 	}
@@ -77,7 +104,10 @@ func (s *nssfService) NSSelectionGetForRegistration(ue *amf_context.AmfUe, reque
 		Tai:                             &ue.Tai, // TS 29.531 R15.3 6.1.3.2.3.1
 	}
 
-	res, localErr := client.NetworkSliceInformationDocumentApi.NSSelectionGet(ctx,
+	//add
+	// res, localErr := client.NetworkSliceInformationDocumentApi.NSSelectionGet(ctx,
+	// 	&paramOpt)
+	res, localErr := client.NetworkSliceInformationDocumentApi.NSSelectionGet(ctxForHTTP,
 		&paramOpt)
 	if localErr == nil {
 		ue.NetworkSliceInfo = &res.AuthorizedNetworkSliceInfo
@@ -116,6 +146,30 @@ func (s *nssfService) NSSelectionGetForPduSession(ue *amf_context.AmfUe, snssai 
 	}
 
 	amfSelf := amf_context.GetSelf()
+
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NNSSF_NSSELECTION,
+		models.NrfNfManagementNfType_NSSF)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → NSSF: NSSelectionGetForPduSession")
+	span.SetAttributes(
+		attribute.String("target.nf", "NSSF"),
+		attribute.String("ue.supi", ue.Supi),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
+
 	sliceInfoForPduSession := models.SliceInfoForPduSession{
 		SNssai:            &snssai,
 		RoamingIndication: models.RoamingIndication_NON_ROAMING, // not support roaming
@@ -130,13 +184,9 @@ func (s *nssfService) NSSelectionGetForPduSession(ue *amf_context.AmfUe, snssai 
 		Tai:                           &ue.Tai, // TS 29.531 R15.3 6.1.3.2.3.1
 	}
 
-	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NNSSF_NSSELECTION,
-		models.NrfNfManagementNfType_NSSF)
-	if err != nil {
-		return nil, nil, err
-	}
-	res, localErr := client.NetworkSliceInformationDocumentApi.NSSelectionGet(ctx, &paramOpt)
-
+	//add
+	// res, localErr := client.NetworkSliceInformationDocumentApi.NSSelectionGet(ctx, &paramOpt)
+	res, localErr := client.NetworkSliceInformationDocumentApi.NSSelectionGet(ctxForHTTP, &paramOpt)
 	if localErr == nil {
 		return &res.AuthorizedNetworkSliceInfo, nil, nil
 	} else {

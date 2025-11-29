@@ -6,6 +6,9 @@ import (
 	"strconv"
 	"time"
 
+	//add
+	stdctx "context"
+
 	"github.com/free5gc/amf/internal/context"
 	gmm_common "github.com/free5gc/amf/internal/gmm/common"
 	gmm_message "github.com/free5gc/amf/internal/gmm/message"
@@ -24,6 +27,10 @@ import (
 	"github.com/free5gc/openapi/models"
 	"github.com/free5gc/util/metrics/ngap"
 	"github.com/free5gc/util/metrics/utils"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func handleNGSetupRequestMain(ran *context.AmfRan,
@@ -116,6 +123,26 @@ func handleUplinkNASTransportMain(ran *context.AmfRan,
 			ranUe.RanUeNgapId, ranUe.AmfUeNgapId)
 		return
 	}
+
+	//add
+	ctx := amfUe.TraceContext
+	if ctx == nil {
+		if ranUe.TraceContext != nil {
+			ctx = ranUe.TraceContext
+		} else {
+			ctx = stdctx.Background()
+		}
+	}
+
+	tracer := otel.Tracer("amf-n2")
+	ctx, span := tracer.Start(ctx, "N2 UplinkNASTransport")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("ue.amfUeId", amfUe.Info()),
+	)
+
+	amfUe.TraceContext = ctx
 
 	if userLocationInformation != nil {
 		ranUe.UpdateLocation(userLocationInformation)
@@ -443,6 +470,33 @@ func handleInitialUEMessageMain(ran *context.AmfRan,
 	if err != nil {
 		ran.Log.Errorf("NewRanUe Error: %+v", err)
 	}
+
+	//add
+	if ranUe.TraceContext == nil {
+		rootTracer := otel.Tracer("amf-root")
+		rootCtx, rootSpan := rootTracer.Start(stdctx.Background(), "UE Registration Flow")
+		rootSpan.SetAttributes(
+			attribute.String("n2.ranId", fmt.Sprintf("%+v", ran.RanId)),
+		)
+		rootSpan.End()
+		ranUe.TraceContext = rootCtx
+	}
+
+	tracer := otel.Tracer("amf-n2")
+	ctx := ranUe.TraceContext
+	if ctx == nil {
+		ctx = stdctx.Background()
+	}
+	ctx, span := tracer.Start(ctx, "N2 InitialUEMessage")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("ran.id", fmt.Sprintf("%+v", ran.RanId)),
+	)
+	ranUe.TraceContext = ctx
+
+	spanCtx := span.SpanContext()
+	ran.Log.Infof("N2 span traceID=%s", spanCtx.TraceID().String())
+
 	ran.Log.Debugf("New RanUe [RanUeNgapID: %d]", ranUe.RanUeNgapId)
 
 	// Try to get identity from 5G-S-TMSI IE first; if not available, try to get identity from the plain NAS.
@@ -497,6 +551,10 @@ func handleInitialUEMessageMain(ran *context.AmfRan,
 	isInvalidGUTI := (idType == "5G-GUTI")
 	amfUe, ok := findAmfUe(ran, id, idType)
 	if ok && !isInvalidGUTI {
+		//add
+		if ranUe.TraceContext != nil {
+			amfUe.TraceContext = ranUe.TraceContext
+		}
 		// TODO: invoke Namf_Communication_UEContextTransfer if serving AMF has changed since
 		// last Registration Request procedure
 		// Described in TS 23.502 4.2.2.2.2 step 4 (without UDSF deployment)

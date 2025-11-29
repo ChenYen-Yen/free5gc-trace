@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -11,6 +12,11 @@ import (
 	Nudm_SubscriberDataManagement "github.com/free5gc/openapi/udm/SubscriberDataManagement"
 	Nudm_UEContextManagement "github.com/free5gc/openapi/udm/UEContextManagement"
 	sbi_metrics "github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type nudmService struct {
@@ -74,10 +80,29 @@ func (s *nudmService) PutUpuAck(ue *amf_context.AmfUe, upuMacIue string) error {
 		return openapi.ReportError("udm not found")
 	}
 
+	//add
+	//amfSelf := amf_context.GetSelf()
+
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		return err
 	}
+
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → UDM: PutUpuAck")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ue.supi", ue.Supi),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
 
 	ackInfo := models.AcknowledgeInfo{
 		UpuMacIue: upuMacIue,
@@ -86,8 +111,11 @@ func (s *nudmService) PutUpuAck(ue *amf_context.AmfUe, upuMacIue string) error {
 		Supi:            &ue.Supi,
 		AcknowledgeInfo: &ackInfo,
 	}
+	//add
+	// _, err = client.ProvidingAcknowledgementOfUEParametersUpdateApi.
+	// 	UpuAck(ctx, &upuReq)
 	_, err = client.ProvidingAcknowledgementOfUEParametersUpdateApi.
-		UpuAck(ctx, &upuReq)
+		UpuAck(ctxForHTTP, &upuReq)
 
 	return err
 }
@@ -106,13 +134,34 @@ func (s *nudmService) SDMGetAmData(ue *amf_context.AmfUe) (problemDetails *model
 		},
 	}
 
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		return nil, err
 	}
 
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → UDM: SDMGetAmData")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ue.supi", ue.Supi),
+	)
+	defer span.End()
+	//amfSelf := amf_context.GetSelf()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
+
+	//add
+	// data, localErr := client.AccessAndMobilitySubscriptionDataRetrievalApi.GetAmData(
+	// 	ctx, &getAmDataParamReq)
 	data, localErr := client.AccessAndMobilitySubscriptionDataRetrievalApi.GetAmData(
-		ctx, &getAmDataParamReq)
+		ctxForHTTP, &getAmDataParamReq)
 	if localErr == nil {
 		ue.AccessAndMobilitySubscriptionData = &data.AccessAndMobilitySubscriptionData
 		if len(data.AccessAndMobilitySubscriptionData.Gpsis) > 0 {
@@ -151,13 +200,34 @@ func (s *nudmService) SDMGetSmfSelectData(ue *amf_context.AmfUe) (problemDetails
 		PlmnId: &ue.PlmnId,
 	}
 
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		return nil, err
 	}
 
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → UDM: SDMGetSmfSelectData")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ue.supi", ue.Supi),
+	)
+	defer span.End()
+	//amfSelf := amf_context.GetSelf()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
+
+	//add
+	// data, localErr := client.SMFSelectionSubscriptionDataRetrievalApi.
+	// 	GetSmfSelData(ctx, &paramReq)
 	data, localErr := client.SMFSelectionSubscriptionDataRetrievalApi.
-		GetSmfSelData(ctx, &paramReq)
+		GetSmfSelData(ctxForHTTP, &paramReq)
 
 	if localErr == nil {
 		ue.SmfSelectionData = &data.SmfSelectionSubscriptionData
@@ -192,17 +262,38 @@ func (s *nudmService) SDMGetUeContextInSmfData(
 		return nil, openapi.ReportError("udm not found")
 	}
 
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		return nil, err
 	}
 
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → UDM: SDMGetUeContextInSmfData")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ue.supi", ue.Supi),
+	)
+	defer span.End()
+	// amfSelf := amf_context.GetSelf()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
+
 	getUeCtxInSmfDataReq := Nudm_SubscriberDataManagement.GetUeCtxInSmfDataRequest{
 		Supi: &ue.Supi,
 	}
 
+	//add
+	// data, localErr := client.UEContextInSMFDataRetrievalApi.
+	// 	GetUeCtxInSmfData(ctx, &getUeCtxInSmfDataReq)
 	data, localErr := client.UEContextInSMFDataRetrievalApi.
-		GetUeCtxInSmfData(ctx, &getUeCtxInSmfDataReq)
+		GetUeCtxInSmfData(ctxForHTTP, &getUeCtxInSmfDataReq)
 	if localErr == nil {
 		ue.UeContextInSmfData = &data.UeContextInSmfData
 	} else {
@@ -234,6 +325,29 @@ func (s *nudmService) SDMSubscribe(ue *amf_context.AmfUe) (problemDetails *model
 	}
 
 	amfSelf := amf_context.GetSelf()
+
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
+	if err != nil {
+		return nil, err
+	}
+
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → UDM: SDMSubscribe")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ue.supi", ue.Supi),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
+
 	sdmSubscription := models.SdmSubscription{
 		NfInstanceId: amfSelf.NfId,
 		PlmnId:       &ue.PlmnId,
@@ -244,13 +358,11 @@ func (s *nudmService) SDMSubscribe(ue *amf_context.AmfUe) (problemDetails *model
 		SdmSubscription: &sdmSubscription,
 	}
 
-	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
-	if err != nil {
-		return nil, err
-	}
-
+	//add
+	// resSubscription, localErr := client.SubscriptionCreationApi.Subscribe(
+	// 	ctx, &subscribeReq)
 	resSubscription, localErr := client.SubscriptionCreationApi.Subscribe(
-		ctx, &subscribeReq)
+		ctxForHTTP, &subscribeReq)
 	if localErr == nil {
 		ue.SdmSubscriptionId = resSubscription.SdmSubscription.SubscriptionId
 		return problemDetails, err
@@ -288,13 +400,34 @@ func (s *nudmService) SDMGetSliceSelectionSubscriptionData(
 		PlmnId: &ue.PlmnId,
 	}
 
+	//add
+	//amfSelf := amf_context.GetSelf()
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		return nil, err
 	}
 
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → UDM: SDMGetSliceSelectionSubscriptionData")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ue.supi", ue.Supi),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
+
+	//add
+	// nssai, localErr := client.SliceSelectionSubscriptionDataRetrievalApi.
+	// 	GetNSSAI(ctx, &paramReq)
 	nssai, localErr := client.SliceSelectionSubscriptionDataRetrievalApi.
-		GetNSSAI(ctx, &paramReq)
+		GetNSSAI(ctxForHTTP, &paramReq)
 
 	if localErr == nil {
 		for _, defaultSnssai := range nssai.Nssai.DefaultSingleNssais {
@@ -345,17 +478,37 @@ func (s *nudmService) SDMUnsubscribe(ue *amf_context.AmfUe) (problemDetails *mod
 		return nil, openapi.ReportError("udm not found")
 	}
 
+	//add
+	//amfSelf := amf_context.GetSelf()
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		return nil, err
 	}
+
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → UDM: SDMUnsubscribe")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ue.supi", ue.Supi),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
 
 	unsubscribeReq := Nudm_SubscriberDataManagement.UnsubscribeRequest{
 		UeId:           &ue.Supi,
 		SubscriptionId: &ue.SdmSubscriptionId,
 	}
 
-	_, localErr := client.SubscriptionDeletionApi.Unsubscribe(ctx, &unsubscribeReq)
+	//add
+	// _, localErr := client.SubscriptionDeletionApi.Unsubscribe(ctx, &unsubscribeReq)
+	_, localErr := client.SubscriptionDeletionApi.Unsubscribe(ctxForHTTP, &unsubscribeReq)
 
 	if localErr != nil {
 		err = localErr
@@ -388,10 +541,29 @@ func (s *nudmService) UeCmRegistration(
 	}
 
 	amfSelf := amf_context.GetSelf()
+
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_UECM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		return nil, err
 	}
+
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → UDM: UeCmRegistration")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("access.type", string(accessType)),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
 
 	switch accessType {
 	case models.AccessType__3_GPP_ACCESS:
@@ -416,7 +588,10 @@ func (s *nudmService) UeCmRegistration(
 			Amf3GppAccessRegistration: &registrationData,
 		}
 
-		_, localErr := client.AMFRegistrationFor3GPPAccessApi.Call3GppRegistration(ctx,
+		//add
+		// _, localErr := client.AMFRegistrationFor3GPPAccessApi.Call3GppRegistration(ctx,
+		// 	&regReq)
+		_, localErr := client.AMFRegistrationFor3GPPAccessApi.Call3GppRegistration(ctxForHTTP,
 			&regReq)
 		if localErr == nil {
 			ue.UeCmRegistered[accessType] = true
@@ -451,8 +626,11 @@ func (s *nudmService) UeCmRegistration(
 			AmfNon3GppAccessRegistration: &registrationData,
 		}
 
+		//add
+		// _, localErr := client.AMFRegistrationForNon3GPPAccessApi.
+		// 	Non3GppRegistration(ctx, &regReq)
 		_, localErr := client.AMFRegistrationForNon3GPPAccessApi.
-			Non3GppRegistration(ctx, &regReq)
+			Non3GppRegistration(ctxForHTTP, &regReq)
 
 		if localErr == nil {
 			ue.UeCmRegistered[accessType] = true
@@ -488,10 +666,27 @@ func (s *nudmService) UeCmDeregistration(
 	}
 
 	amfSelf := amf_context.GetSelf()
+
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_UECM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		return nil, err
 	}
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → UDM: UeCmDeregistration")
+	span.SetAttributes(
+		attribute.String("target.nf", "UDM"),
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("access.type", string(accessType)),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
 
 	switch accessType {
 	case models.AccessType__3_GPP_ACCESS:
@@ -505,9 +700,11 @@ func (s *nudmService) UeCmDeregistration(
 			Amf3GppAccessRegistrationModification: &modificationData,
 		}
 
-		_, localErr := client.ParameterUpdateInTheAMFRegistrationFor3GPPAccessApi.Update3GppRegistration(ctx,
+		//add
+		// _, localErr := client.ParameterUpdateInTheAMFRegistrationFor3GPPAccessApi.Update3GppRegistration(ctx,
+		// 	&modificationReq)
+		_, localErr := client.ParameterUpdateInTheAMFRegistrationFor3GPPAccessApi.Update3GppRegistration(ctxForHTTP,
 			&modificationReq)
-
 		if localErr == nil {
 			return nil, nil
 		} else {
@@ -538,8 +735,11 @@ func (s *nudmService) UeCmDeregistration(
 			AmfNon3GppAccessRegistrationModification: &modificationData,
 		}
 
+		//add
+		// _, localErr := client.ParameterUpdateInTheAMFRegistrationForNon3GPPAccessApi.UpdateNon3GppRegistration(
+		// 	ctx, &modificationReq)
 		_, localErr := client.ParameterUpdateInTheAMFRegistrationForNon3GPPAccessApi.UpdateNon3GppRegistration(
-			ctx, &modificationReq)
+			ctxForHTTP, &modificationReq)
 
 		if localErr == nil {
 			return nil, nil

@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	//add
+	stdctx "context"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/mohae/deepcopy"
 	"github.com/pkg/errors"
@@ -35,6 +38,10 @@ import (
 	Nnrf_NFDiscovery "github.com/free5gc/openapi/nrf/NFDiscovery"
 	"github.com/free5gc/util/fsm"
 	nasMetrics "github.com/free5gc/util/metrics/nas"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const psiArraySize = 16
@@ -389,6 +396,25 @@ func HandleRegistrationRequest(ue *context.AmfUe, anType models.AccessType, proc
 		return fmt.Errorf("RanUe is nil")
 	}
 
+	//add
+	tracer := otel.Tracer("amf-gmm")
+	ctx := ue.TraceContext
+	if ctx == nil {
+		ctx = stdctx.Background()
+	}
+	ctx, span := tracer.Start(ctx, "GMM RegistrationRequest")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("ue.info", ue.Info()),
+		attribute.String("amf.guami", fmt.Sprintf("%+v", amfSelf.ServedGuamiList[0])),
+	)
+	ue.TraceContext = ctx
+	span.AddEvent("GMM.Registration.Start")
+
+	spanCtx := span.SpanContext()
+	logger.AppLog.Infof("AMF incoming traceID: %s", spanCtx.TraceID().String())
+
 	ue.SetOnGoing(anType, &context.OnGoing{
 		Procedure: context.OnGoingProcedureRegistration,
 	})
@@ -569,6 +595,9 @@ func HandleRegistrationRequest(ue *context.AmfUe, anType models.AccessType, proc
 		}
 	}
 
+	//add
+	span.AddEvent("GMM.Registration.Complete")
+
 	return nil
 }
 
@@ -622,6 +651,25 @@ func IdentityVerification(ue *context.AmfUe) bool {
 }
 
 func HandleInitialRegistration(ue *context.AmfUe, anType models.AccessType) error {
+	//add
+	tracer := otel.Tracer("amf-gmm")
+	ctx := ue.TraceContext
+	if ctx == nil {
+		ctx = stdctx.Background()
+	}
+	ctx, span := tracer.Start(ctx, "GMM HandleInitialRegistration")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("ue.info", ue.Info()),
+		attribute.String("amf.guami", fmt.Sprintf("%+v", context.GetSelf().ServedGuamiList[0])),
+	)
+	ue.TraceContext = ctx
+	span.AddEvent("GMM.Registration.Initial")
+
+	spanCtx := span.SpanContext()
+	logger.AppLog.Infof("AMF incoming traceID: %s", spanCtx.TraceID().String())
+
 	ue.GmmLog.Infoln("Handle InitialRegistration")
 
 	amfSelf := context.GetSelf()
@@ -1630,6 +1678,22 @@ func HandleConfigurationUpdateComplete(ue *context.AmfUe,
 }
 
 func AuthenticationProcedure(ue *context.AmfUe, accessType models.AccessType) (bool, error) {
+	//add
+	tracer := otel.Tracer("amf-gmm")
+	ctx := ue.TraceContext
+	if ctx == nil {
+		ctx = stdctx.Background()
+	}
+	ctx, span := tracer.Start(ctx, "GMM AuthenticationProcedure")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("ue.suci", ue.Suci),
+		attribute.String("ue.info", ue.Info()),
+	)
+	ue.TraceContext = ctx
+	span.AddEvent("GMM.Authentication.Start")
+
 	ue.GmmLog.Info("Authentication procedure")
 
 	// Check whether UE has SUCI and SUPI
@@ -1711,6 +1775,21 @@ func HandleServiceRequest(ue *context.AmfUe, anType models.AccessType,
 	if ue == nil {
 		return fmt.Errorf("AmfUe is nil")
 	}
+
+	//add
+	tracer := otel.Tracer("amf-gmm")
+	ctx := ue.TraceContext
+	if ctx == nil {
+		ctx = stdctx.Background()
+	}
+	ctx, span := tracer.Start(ctx, "GMM ServiceRequest")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("ue.info", ue.Info()),
+	)
+	ue.TraceContext = ctx
+	span.AddEvent("GMM.Service.Start")
 
 	ue.GmmLog.Info("Handle Service Request")
 
@@ -1936,6 +2015,7 @@ func HandleServiceRequest(ue *context.AmfUe, anType models.AccessType,
 		ue.GmmLog.Info(errPduSessionId, errCause)
 	}
 	ue.N1N2Message = nil
+
 	return nil
 }
 
@@ -1943,6 +2023,21 @@ func HandleServiceRequest(ue *context.AmfUe, anType models.AccessType,
 func HandleAuthenticationResponse(ue *context.AmfUe, accessType models.AccessType,
 	authenticationResponse *nasMessage.AuthenticationResponse,
 ) error {
+	//add
+	tracer := otel.Tracer("amf-gmm")
+	ctx := ue.TraceContext
+	if ctx == nil {
+		ctx = stdctx.Background()
+	}
+	ctx, span := tracer.Start(ctx, "GMM HandleAuthenticationResponse")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("ue.suci", ue.Suci),
+		attribute.String("ue.info", ue.Info()),
+	)
+	ue.TraceContext = ctx
+
 	ue.GmmLog.Info("Handle Authentication Response")
 
 	ue.StopT3560()
@@ -2321,6 +2416,21 @@ func HandleSecurityModeReject(ue *context.AmfUe, anType models.AccessType,
 func HandleDeregistrationRequest(ue *context.AmfUe, anType models.AccessType,
 	deregistrationRequest *nasMessage.DeregistrationRequestUEOriginatingDeregistration,
 ) error {
+	//add
+	tracer := otel.Tracer("amf-gmm")
+	ctx := ue.TraceContext
+	if ctx == nil {
+		ctx = stdctx.Background()
+	}
+	ctx, span := tracer.Start(ctx, "GMM DeregistrationRequest")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("ue.info", ue.Info()),
+	)
+	ue.TraceContext = ctx
+	span.AddEvent("GMM.Deregistration.Start")
+
 	ue.GmmLog.Info("Handle Deregistration Request(UE Originating)")
 
 	targetDeregistrationAccessType := deregistrationRequest.GetAccessType()
@@ -2408,6 +2518,7 @@ func HandleDeregistrationRequest(ue *context.AmfUe, anType models.AccessType,
 		}, logger.GmmLog)
 	}
 
+	span.AddEvent("GMM.Deregistration.Complete")
 	return nil
 }
 

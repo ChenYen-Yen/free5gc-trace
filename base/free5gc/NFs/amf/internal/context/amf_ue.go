@@ -1,6 +1,7 @@
 package context
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
@@ -203,6 +204,9 @@ type AmfUe struct {
 	GmmStateEnterTime time.Time
 	UeConnected       bool
 	AnTypeFlags       map[models.AccessType]bool
+
+	//add
+	TraceContext context.Context
 }
 
 type AmfUeEventSubscription struct {
@@ -292,6 +296,9 @@ func (ue *AmfUe) init() {
 	ue.NASLog = logger.GmmLog
 	ue.ProducerLog = logger.ProducerLog
 	ue.AnTypeFlags = make(map[models.AccessType]bool)
+
+	//add
+	ue.TraceContext = context.Background()
 }
 
 func (ue *AmfUe) ServingAMF() *AMFContext {
@@ -1000,4 +1007,24 @@ func (ue *AmfUe) StopT3555() {
 	ue.GmmLog.Infof("Stop T3555 timer")
 	ue.T3555.Stop()
 	ue.T3555 = nil // clear the timer
+}
+
+// add
+func (ue *AmfUe) Info() string {
+	if ue == nil {
+		return "<nil>"
+	}
+
+	// 優先順序：SUPI > SUCI > GUTI
+	if ue.Supi != "" {
+		return ue.Supi
+	}
+	if ue.Suci != "" {
+		return ue.Suci
+	}
+	if ue.Guti != "" {
+		return ue.Guti
+	}
+
+	return "<unknown-ue>"
 }

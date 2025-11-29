@@ -1,6 +1,7 @@
 package context
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"time"
@@ -69,6 +70,9 @@ type RanUe struct {
 
 	/* logger */
 	Log *logrus.Entry
+
+	//add
+	TraceContext context.Context
 }
 
 func (ranUe *RanUe) Remove() error {

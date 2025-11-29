@@ -580,3 +580,39 @@ func (c *AMFContext) AuthorizationCheck(token string, serviceName models.Service
 	logger.UtilLog.Debugf("AMFContext::AuthorizationCheck: token[%s] serviceName[%s]\n", token, serviceName)
 	return oauth.VerifyOAuth(token, string(serviceName), c.NrfCertPem)
 }
+
+// add
+// func (c *AMFContext) GetTokenCtxWithBase(
+// 	baseCtx context.Context,
+// 	serviceName models.ServiceName,
+// 	targetNF models.NrfNfManagementNfType,
+// ) (context.Context, *models.ProblemDetails, error) {
+
+// 	if baseCtx == nil {
+// 		baseCtx = context.TODO()
+// 	}
+
+// 	if !c.OAuth2Required {
+// 		// 沒開 OAuth2：直接用你的 baseCtx，讓 trace 可以延續
+// 		return baseCtx, nil, nil
+// 	}
+
+// 	// 有開 OAuth2：暫時還是沿用原本的 oauth.GetTokenCtx 實作
+// 	// 這會回傳一個新的 ctx，內含 token / metadata，但目前沒辦法「把它 merge 回 baseCtx」
+// 	ctxWithToken, pd, err := oauth.GetTokenCtx(
+// 		models.NrfNfManagementNfType_AMF,
+// 		targetNF,
+// 		c.NfId,
+// 		c.NrfUri,
+// 		string(serviceName),
+// 	)
+// 	if err != nil {
+// 		logger.AppLog.Errorf("GetTokenCtx error for service %s -> targetNF %s: %v",
+// 			serviceName, targetNF, err)
+// 	}
+// 	if pd != nil {
+// 		logger.AppLog.Warnf("GetTokenCtx problemDetails for service %s -> targetNF %s: %+v",
+// 			serviceName, targetNF, pd)
+// 	}
+// 	return ctxWithToken, pd, err
+// }

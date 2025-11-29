@@ -8,6 +8,11 @@ import (
 	"strings"
 	"sync"
 
+	//add
+	"context"
+	"net/http"
+	"time"
+
 	amf_context "github.com/free5gc/amf/internal/context"
 	"github.com/free5gc/amf/internal/logger"
 	"github.com/free5gc/nas/nasType"
@@ -15,6 +20,12 @@ import (
 	Nausf_UEAuthentication "github.com/free5gc/openapi/ausf/UEAuthentication"
 	"github.com/free5gc/openapi/models"
 	sbi_metrics "github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type nausfService struct {
@@ -39,6 +50,7 @@ func (s *nausfService) getUEAuthenticationClient(uri string) *Nausf_UEAuthentica
 	configuration := Nausf_UEAuthentication.NewConfiguration()
 	configuration.SetBasePath(uri)
 	configuration.SetMetrics(sbi_metrics.SbiMetricHook)
+	configuration.SetHTTPClient(newOtelHTTPClient()) //add
 	client = Nausf_UEAuthentication.NewAPIClient(configuration)
 
 	s.UEAuthenticationMu.RUnlock()
@@ -57,6 +69,30 @@ func (s *nausfService) SendUEAuthenticationAuthenticateRequest(ue *amf_context.A
 	}
 
 	amfSelf := amf_context.GetSelf()
+
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NAUSF_AUTH, models.NrfNfManagementNfType_AUSF)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → AUSF: SendUEAuthenticationAuthenticateRequest")
+	span.SetAttributes(
+		attribute.String("target.nf", "AUSF"),
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("ue.suci", ue.Suci),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
+
 	servedGuami := amfSelf.ServedGuamiList[0]
 
 	var authInfo models.AuthenticationInfo
@@ -69,16 +105,14 @@ func (s *nausfService) SendUEAuthenticationAuthenticateRequest(ue *amf_context.A
 	if resynchronizationInfo != nil {
 		authInfo.ResynchronizationInfo = resynchronizationInfo
 	}
-	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NAUSF_AUTH, models.NrfNfManagementNfType_AUSF)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	authReq := Nausf_UEAuthentication.UeAuthenticationsPostRequest{
 		AuthenticationInfo: &authInfo,
 	}
 
-	res, localErr := client.DefaultApi.UeAuthenticationsPost(ctx, &authReq)
+	//add
+	// res, localErr := client.DefaultApi.UeAuthenticationsPost(ctx, &authReq)
+	res, localErr := client.DefaultApi.UeAuthenticationsPost(ctxForHTTP, &authReq)
 	if localErr == nil {
 		return &res.UeAuthenticationCtx, nil, nil
 	} else {
@@ -94,7 +128,9 @@ func (s *nausfService) SendUEAuthenticationAuthenticateRequest(ue *amf_context.A
 				return nil, nil, openapi.ReportError("openapi error")
 			}
 		case error:
-			return nil, openapi.ProblemDetailsSystemFailure(errType.Error()), err
+			//add
+			return nil, openapi.ProblemDetailsSystemFailure(errType.Error()), localErr
+			// return nil, openapi.ProblemDetailsSystemFailure(errType.Error()), err
 		default:
 			return nil, nil, openapi.ReportError("server no response")
 		}
@@ -121,10 +157,29 @@ func (s *nausfService) SendAuth5gAkaConfirmRequest(ue *amf_context.AmfUe, resSta
 		return nil, nil, openapi.ReportError("ausf not found")
 	}
 
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NAUSF_AUTH, models.NrfNfManagementNfType_AUSF)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → AUSF: SendUEAuthenticationAuthenticateRequest")
+	span.SetAttributes(
+		attribute.String("target.nf", "AUSF"),
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("ue.suci", ue.Suci),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
+
 	// confirmUri.RequestURI() = "/nausf-auth/v1/ue-authentications/{authctxId}/5g-aka-confirmation"
 	// splituri = ["","nausf-auth","ue-authentications",{authctxId},"5g-aka-confirmation"]
 	// authctxId = {authctxId}
@@ -142,8 +197,12 @@ func (s *nausfService) SendAuth5gAkaConfirmRequest(ue *amf_context.AmfUe, resSta
 			ResStar: resStar,
 		},
 	}
+	//add
+	// confirmResult, localErr := client.DefaultApi.UeAuthenticationsAuthCtxId5gAkaConfirmationPut(
+	// 	ctx, confirmData)
 	confirmResult, localErr := client.DefaultApi.UeAuthenticationsAuthCtxId5gAkaConfirmationPut(
-		ctx, confirmData)
+		ctxForHTTP, confirmData)
+
 	if localErr == nil {
 		return &confirmResult.ConfirmationDataResponse, nil, nil
 	} else {
@@ -201,12 +260,33 @@ func (s *nausfService) SendEapAuthConfirmRequest(ue *amf_context.AmfUe, eapMsg n
 			EapPayload: base64.StdEncoding.EncodeToString(eapMsg.GetEAPMessage()),
 		},
 	}
+
+	//add
+	baseCtx := ue.TraceContext
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NAUSF_AUTH, models.NrfNfManagementNfType_AUSF)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	eapSession, localErr := client.DefaultApi.EapAuthMethod(ctx, &eapSessionReq)
+	tracer := otel.Tracer("amf-sbi")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → AUSF: SendEapAuthConfirmRequest")
+	span.SetAttributes(
+		attribute.String("target.nf", "AUSF"),
+		attribute.String("ue.supi", ue.Supi),
+		attribute.String("ue.suci", ue.Suci),
+	)
+	defer span.End()
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	ue.TraceContext = spanCtx
+
+	//add
+	// eapSession, localErr := client.DefaultApi.EapAuthMethod(ctx, &eapSessionReq)
+	eapSession, localErr := client.DefaultApi.EapAuthMethod(ctxForHTTP, &eapSessionReq)
 
 	if localErr == nil {
 		response = &eapSession.EapSession
@@ -231,4 +311,12 @@ func (s *nausfService) SendEapAuthConfirmRequest(ue *amf_context.AmfUe, eapMsg n
 	}
 
 	return response, problemDetails, err
+}
+
+// add
+func newOtelHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+		Timeout:   30 * time.Second,
+	}
 }
