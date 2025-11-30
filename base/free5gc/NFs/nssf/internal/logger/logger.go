@@ -20,6 +20,7 @@ var (
 	NsselLog      *logrus.Entry
 	NssaiavailLog *logrus.Entry
 	UtilLog       *logrus.Entry
+	AppLog        *logrus.Entry
 )
 
 func init() {
@@ -40,4 +41,5 @@ func init() {
 	NsselLog = NfLog.WithField(logger_util.FieldCategory, "NsSel")
 	NssaiavailLog = NfLog.WithField(logger_util.FieldCategory, "NssaiAvail")
 	UtilLog = NfLog.WithField(logger_util.FieldCategory, "Util")
+	AppLog = NfLog.WithField(logger_util.FieldCategory, "App")
 }

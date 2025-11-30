@@ -17,6 +17,10 @@ import (
 	"github.com/free5gc/openapi"
 	"github.com/free5gc/openapi/models"
 	"github.com/free5gc/openapi/nrf/NFManagement"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type NrfService struct {
@@ -46,10 +50,25 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nssfCtx *nssf_
 	resourceNrfUri string, retrieveNfInstanceId string, err error,
 ) {
 	nfInstanceId := nssfCtx.NfId
+
+	//add
+	tracer := otel.Tracer("nssf-sbi")
+	ctx, span := tracer.Start(ctx, "NSSF → NRF: RegisterNFInstance")
+	span.SetAttributes(
+		attribute.String("nf.instance_id", nfInstanceId),
+	)
+	defer span.End()
+
 	profile, err := ns.buildNFProfile(nssfCtx)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to build nrf profile: %s", err.Error())
 	}
+
+	//add
+	span.SetAttributes(
+		attribute.String("nf.type", string(profile.NfType)),
+	)
+
 	apiClient := ns.nrfNfMgmtClient
 
 	var res *NFManagement.RegisterNFInstanceResponse
@@ -79,6 +98,12 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nssfCtx *nssf_
 			resourceNrfUri, _, _ = strings.Cut(resourceUri, "/nnrf-nfm/")
 			retrieveNfInstanceId = resourceUri[strings.LastIndex(resourceUri, "/")+1:]
 			nf = res.NrfNfManagementNfProfile
+
+			//add
+			span.SetAttributes(
+				attribute.String("nrf.resource_uri", resourceUri),
+				attribute.String("nrf.base_uri", resourceNrfUri),
+			)
 
 			oauth2 := false
 			if nf.CustomInfo != nil {

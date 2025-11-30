@@ -18,6 +18,9 @@ import (
 	"github.com/free5gc/util/httpwrapper"
 	logger_util "github.com/free5gc/util/logger"
 	"github.com/free5gc/util/metrics"
+
+	//add
+	otelgin "go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 type nssfApp interface {
@@ -100,7 +103,13 @@ func bindRouter(nssf app.NssfApp, router *gin.Engine, tlsKeyLogPath string) (*ht
 
 func newRouter(s *Server) *gin.Engine {
 	router := logger_util.NewGinWithLogrus(logger.GinLog)
-	router.Use(metrics.InboundMetrics())
+	//add
+	router.Use(
+		otelgin.Middleware("nssf-sbi-server"),
+		metrics.InboundMetrics(),
+	)
+
+	//router.Use(metrics.InboundMetrics())
 
 	for _, serviceName := range s.Config().Configuration.ServiceNameList {
 		switch serviceName {
