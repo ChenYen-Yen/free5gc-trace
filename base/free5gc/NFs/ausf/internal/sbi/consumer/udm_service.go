@@ -12,7 +12,9 @@ import (
 
 	//add
 	"context"
+	"net/http"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -43,6 +45,7 @@ func (s *nudmService) getUdmUeauClient(uri string) *Nudm_UEAU.APIClient {
 	configuration := Nudm_UEAU.NewConfiguration()
 	configuration.SetBasePath(uri)
 	configuration.SetMetrics(sbi_metrics.SbiMetricHook)
+	configuration.SetHTTPClient(newOtelHTTPClient()) //add
 	client = Nudm_UEAU.NewAPIClient(configuration)
 
 	s.ueauMu.RUnlock()
@@ -168,4 +171,11 @@ func (s *nudmService) GenerateAuthDataApi(
 	)
 
 	return &authInfoResult, nil, nil, spanCtx
+}
+
+func newOtelHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+		Timeout:   30 * time.Second,
+	}
 }
