@@ -43,6 +43,7 @@ func (s *nudmService) getSubscriberDMngmntClients(uri string) *Nudm_SubscriberDa
 	configuration := Nudm_SubscriberDataManagement.NewConfiguration()
 	configuration.SetBasePath(uri)
 	configuration.SetMetrics(sbi_metrics.SbiMetricHook)
+	configuration.SetHTTPClient(newOtelHTTPClient()) //add
 	client = Nudm_SubscriberDataManagement.NewAPIClient(configuration)
 
 	s.SubscriberDMngmntMu.RUnlock()
@@ -65,6 +66,7 @@ func (s *nudmService) getUEContextMngmntClient(uri string) *Nudm_UEContextManage
 
 	configuration := Nudm_UEContextManagement.NewConfiguration()
 	configuration.SetBasePath(uri)
+	configuration.SetHTTPClient(newOtelHTTPClient()) //add
 	client = Nudm_UEContextManagement.NewAPIClient(configuration)
 
 	s.UEContextMngmntMu.RUnlock()
