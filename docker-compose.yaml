@@ -108,7 +108,14 @@ services:
       - ./config/nssfcfg.yaml:/free5gc/config/nssfcfg.yaml
       - ./cert:/free5gc/cert
     environment:
-      GIN_MODE: release
+      - GIN_MODE=release
+      # 暫時完全不要送去 OTLP collector
+      - OTEL_TRACES_EXPORTER=none
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_INSECURE=true
     networks:
       privnet:
         aliases:
@@ -164,7 +171,6 @@ services:
       - ./config/udmcfg.yaml:/free5gc/config/udmcfg.yaml
       - ./cert:/free5gc/cert
     environment:
-      environment:
       - GIN_MODE=release
       # 暫時完全不要送去 OTLP collector
       - OTEL_TRACES_EXPORTER=none
