@@ -5,6 +5,13 @@ import (
 	"net/http"
 	"strconv"
 
+	//add
+	"context"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -17,13 +24,30 @@ import (
 	"github.com/free5gc/util/metrics/sbi"
 )
 
-func (p *Processor) GetAmDataProcedure(c *gin.Context, supi string, plmnID string, supportedFeatures string) {
+var tracer = otel.Tracer("free5gc/udm/processor")
+
+func (p *Processor) GetAmDataProcedure(baseCtx context.Context, c *gin.Context, supi string, plmnID string, supportedFeatures string) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM GetAmDataProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+		attribute.String("supported_features", supportedFeatures),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	var queryAmDataRequest Nudr_DataRepository.QueryAmDataRequest
 	queryAmDataRequest.SupportedFeatures = &supportedFeatures
 	queryAmDataRequest.UeId = &supi
@@ -37,7 +61,7 @@ func (p *Processor) GetAmDataProcedure(c *gin.Context, supi string, plmnID strin
 		return
 	}
 	accessAndMobilitySubscriptionDataResp, err := clientAPI.AccessAndMobilitySubscriptionDataDocumentApi.
-		QueryAmData(ctx, &queryAmDataRequest)
+		QueryAmData(ctxForHTTP, &queryAmDataRequest) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -63,12 +87,24 @@ func (p *Processor) GetAmDataProcedure(c *gin.Context, supi string, plmnID strin
 	c.String(http.StatusInternalServerError, "accessAndMobilitySubscriptionDataResp is nil")
 }
 
-func (p *Processor) GetIdTranslationResultProcedure(c *gin.Context, gpsi string) {
+func (p *Processor) GetIdTranslationResultProcedure(baseCtx context.Context, c *gin.Context, gpsi string) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM GetIdTranslationResultProcedure")
+	span.SetAttributes(
+		attribute.String("gpsi", gpsi),
+	)
+	defer span.End()
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	var idTranslationResult models.IdTranslationResult
 	var getIdentityDataRequest Nudr_DataRepository.GetIdentityDataRequest
 
@@ -83,7 +119,7 @@ func (p *Processor) GetIdTranslationResultProcedure(c *gin.Context, gpsi string)
 	}
 
 	idTranslationResultResp, err := clientAPI.QueryIdentityDataBySUPIOrGPSIDocumentApi.GetIdentityData(
-		ctx, &getIdentityDataRequest)
+		ctxForHTTP, &getIdentityDataRequest) //add
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if getIdTransError, ok2 := apiErr.Model().(Nudr_DataRepository.GetIdentityDataError); ok2 {
@@ -114,18 +150,35 @@ func (p *Processor) GetIdTranslationResultProcedure(c *gin.Context, gpsi string)
 	}
 }
 
-func (p *Processor) GetSupiProcedure(c *gin.Context,
+func (p *Processor) GetSupiProcedure(
+	baseCtx context.Context, //add
+	c *gin.Context,
 	supi string,
 	plmnID string,
 	dataSetNames []string,
 	supportedFeatures string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM GetSupiProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+		attribute.String("supported_features", supportedFeatures),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	if len(dataSetNames) < 2 {
 		problemDetails := &models.ProblemDetails{
 			Status: http.StatusBadRequest,
@@ -169,7 +222,7 @@ func (p *Processor) GetSupiProcedure(c *gin.Context,
 		p.Context().CreateAccessMobilitySubsDataForUe(supi, body)
 
 		amDataRsp, err := clientAPI.AccessAndMobilitySubscriptionDataDocumentApi.QueryAmData(
-			ctx, &queryAmDataRequest)
+			ctxForHTTP, &queryAmDataRequest) //add
 		if err != nil {
 			apiError, ok := err.(openapi.GenericOpenAPIError)
 			if ok {
@@ -195,7 +248,7 @@ func (p *Processor) GetSupiProcedure(c *gin.Context,
 		var smfSelSubsbody models.SmfSelectionSubscriptionData
 		p.Context().CreateSmfSelectionSubsDataforUe(supi, smfSelSubsbody)
 
-		smfSelDataRsp, err := clientAPI.SMFSelectionSubscriptionDataDocumentApi.QuerySmfSelectData(ctx,
+		smfSelDataRsp, err := clientAPI.SMFSelectionSubscriptionDataDocumentApi.QuerySmfSelectData(ctxForHTTP, //add
 			&querySmfSelectDataRequest)
 		if err != nil {
 			apiError, ok := err.(openapi.GenericOpenAPIError)
@@ -225,7 +278,7 @@ func (p *Processor) GetSupiProcedure(c *gin.Context,
 		p.Context().CreateUeContextInSmfDataforUe(supi, UeContextInSmfbody)
 
 		pdusess, err := clientAPI.SMFRegistrationsCollectionApi.QuerySmfRegList(
-			ctx, &querySmfRegListRequest)
+			ctxForHTTP, &querySmfRegListRequest) //add
 		if err != nil {
 			apiError, ok := err.(openapi.GenericOpenAPIError)
 			if ok {
@@ -277,7 +330,7 @@ func (p *Processor) GetSupiProcedure(c *gin.Context,
 		querySmDataRequest.UeId = &supi
 		querySmDataRequest.ServingPlmnId = &plmnID
 		sessionManagementSubscriptionDataRsp, err := clientAPI.SessionManagementSubscriptionDataApi.
-			QuerySmData(ctx, &querySmDataRequest)
+			QuerySmData(ctxForHTTP, &querySmDataRequest) //add
 		if err != nil {
 			apiError, ok := err.(openapi.GenericOpenAPIError)
 			if ok {
@@ -308,7 +361,7 @@ func (p *Processor) GetSupiProcedure(c *gin.Context,
 		queryTraceDataRequest.UeId = &supi
 		queryTraceDataRequest.ServingPlmnId = &plmnID
 		traceDataRsp, err := clientAPI.TraceDataDocumentApi.QueryTraceData(
-			ctx, &queryTraceDataRequest)
+			ctxForHTTP, &queryTraceDataRequest) //add
 		if err != nil {
 			apiError, ok := err.(openapi.GenericOpenAPIError)
 			if ok {
@@ -338,13 +391,25 @@ func (p *Processor) GetSupiProcedure(c *gin.Context,
 	c.JSON(http.StatusOK, subscriptionDataSets)
 }
 
-func (p *Processor) GetSharedDataProcedure(c *gin.Context, sharedDataIds []string, supportedFeatures string) {
+func (p *Processor) GetSharedDataProcedure(baseCtx context.Context, c *gin.Context, sharedDataIds []string, supportedFeatures string) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM GetSharedDataProcedure")
+	span.SetAttributes(
+		attribute.String("supported_features", supportedFeatures),
+	)
+	defer span.End()
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	clientAPI, err := p.Consumer().CreateUDMClientToUDR("")
 	if err != nil {
 		problemDetails := openapi.ProblemDetailsSystemFailure(err.Error())
@@ -357,7 +422,7 @@ func (p *Processor) GetSharedDataProcedure(c *gin.Context, sharedDataIds []strin
 	getSharedDataRequest.SupportedFeatures = &supportedFeatures
 	getSharedDataRequest.SharedDataIds = sharedDataIds
 
-	sharedDataResp, err := clientAPI.RetrievalOfSharedDataApi.GetSharedData(ctx,
+	sharedDataResp, err := clientAPI.RetrievalOfSharedDataApi.GetSharedData(ctxForHTTP, //add
 		&getSharedDataRequest)
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
@@ -380,6 +445,7 @@ func (p *Processor) GetSharedDataProcedure(c *gin.Context, sharedDataIds []strin
 }
 
 func (p *Processor) GetSmDataProcedure(
+	baseCtx context.Context, //add
 	c *gin.Context,
 	supi string,
 	plmnID string,
@@ -387,12 +453,28 @@ func (p *Processor) GetSmDataProcedure(
 	Snssai string,
 	supportedFeatures string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM GetSmDataProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+		attribute.String("dnn", Dnn),
+		attribute.String("snssai", Snssai),
+		attribute.String("supported_features", supportedFeatures),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	logger.SdmLog.Infof("getSmDataProcedure: SUPI[%s] PLMNID[%s] DNN[%s] SNssai[%s]", supi, plmnID, Dnn, Snssai)
 
 	clientAPI, err := p.Consumer().CreateUDMClientToUDR(supi)
@@ -425,7 +507,7 @@ func (p *Processor) GetSmDataProcedure(
 	querySmDataRequest.ServingPlmnId = &plmnID
 
 	sessionManagementSubscriptionDataResp, err := clientAPI.SessionManagementSubscriptionDataApi.
-		QuerySmData(ctx, &querySmDataRequest)
+		QuerySmData(ctxForHTTP, &querySmDataRequest) //add
 	if err != nil {
 		logger.ProcLog.Errorf("QuerySmData Error: %+v", err)
 		apiError, ok := err.(openapi.GenericOpenAPIError)
@@ -474,13 +556,28 @@ func (p *Processor) GetSmDataProcedure(
 	}
 }
 
-func (p *Processor) GetNssaiProcedure(c *gin.Context, supi string, plmnID string, supportedFeatures string) {
+func (p *Processor) GetNssaiProcedure(baseCtx context.Context, c *gin.Context, supi string, plmnID string, supportedFeatures string) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM GetNssaiProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+		attribute.String("supported_features", supportedFeatures),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	var queryAmDataRequest Nudr_DataRepository.QueryAmDataRequest
 	queryAmDataRequest.SupportedFeatures = &supportedFeatures
 	queryAmDataRequest.UeId = &supi
@@ -496,7 +593,7 @@ func (p *Processor) GetNssaiProcedure(c *gin.Context, supi string, plmnID string
 	}
 
 	accessAndMobilitySubscriptionDataResp, err := clientAPI.AccessAndMobilitySubscriptionDataDocumentApi.
-		QueryAmData(ctx, &queryAmDataRequest)
+		QueryAmData(ctxForHTTP, &queryAmDataRequest)
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -520,13 +617,28 @@ func (p *Processor) GetNssaiProcedure(c *gin.Context, supi string, plmnID string
 	c.JSON(http.StatusOK, udmUe.Nssai)
 }
 
-func (p *Processor) GetSmfSelectDataProcedure(c *gin.Context, supi string, plmnID string, supportedFeatures string) {
+func (p *Processor) GetSmfSelectDataProcedure(baseCtx context.Context, c *gin.Context, supi string, plmnID string, supportedFeatures string) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM GetSmfSelectDataProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+		attribute.String("supported_features", supportedFeatures),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	var querySmfSelectDataRequest Nudr_DataRepository.QuerySmfSelectDataRequest
 	querySmfSelectDataRequest.SupportedFeatures = &supportedFeatures
 	querySmfSelectDataRequest.UeId = &supi
@@ -545,7 +657,7 @@ func (p *Processor) GetSmfSelectDataProcedure(c *gin.Context, supi string, plmnI
 	p.Context().CreateSmfSelectionSubsDataforUe(supi, body)
 
 	smfSelectionSubscriptionDataResp, err := clientAPI.SMFSelectionSubscriptionDataDocumentApi.
-		QuerySmfSelectData(ctx, &querySmfSelectDataRequest)
+		QuerySmfSelectData(ctxForHTTP, &querySmfSelectDataRequest) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -567,7 +679,7 @@ func (p *Processor) GetSmfSelectDataProcedure(c *gin.Context, supi string, plmnI
 	c.JSON(http.StatusOK, udmUe.SmfSelSubsData)
 }
 
-func (p *Processor) SubscribeToSharedDataProcedure(c *gin.Context, sdmSubscription *models.SdmSubscription) {
+func (p *Processor) SubscribeToSharedDataProcedure(baseCtx context.Context, c *gin.Context, sdmSubscription *models.SdmSubscription) {
 	if sdmSubscription.NfInstanceId == "" {
 		logger.SdmLog.Warnf("Missing mandatory parameter: nfInstanceId")
 		problemDetails := models.ProblemDetails{
@@ -589,6 +701,13 @@ func (p *Processor) SubscribeToSharedDataProcedure(c *gin.Context, sdmSubscripti
 		c.JSON(http.StatusBadRequest, problemDetails)
 		return
 	}
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM SubscribeToSharedDataProcedure")
+	defer span.End()
 
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
@@ -596,12 +715,13 @@ func (p *Processor) SubscribeToSharedDataProcedure(c *gin.Context, sdmSubscripti
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	var subscibeToShareDataRequest SubscriberDataManagement.SubscribeToSharedDataRequest
 	subscibeToShareDataRequest.SdmSubscription = sdmSubscription
 	udmClientAPI := p.Consumer().GetSDMClient("subscribeToSharedData")
 
 	sdmSubscriptionResp, err := udmClientAPI.SubscriptionCreationForSharedDataApi.SubscribeToSharedData(
-		ctx, &subscibeToShareDataRequest)
+		ctxForHTTP, &subscibeToShareDataRequest) //add
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if subToShareDataErr, ok2 := apiErr.Model().(SubscriberDataManagement.SubscribeToSharedDataError); ok2 {
@@ -626,13 +746,22 @@ func (p *Processor) SubscribeToSharedDataProcedure(c *gin.Context, sdmSubscripti
 	c.JSON(http.StatusOK, sdmSubscriptionResp.SdmSubscription)
 }
 
-func (p *Processor) SubscribeProcedure(c *gin.Context, sdmSubscription *models.SdmSubscription, supi string) {
+func (p *Processor) SubscribeProcedure(baseCtx context.Context, c *gin.Context, sdmSubscription *models.SdmSubscription, supi string) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM SubscribeProcedure")
+	defer span.End()
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	clientAPI, err := p.Consumer().CreateUDMClientToUDR(supi)
 	if err != nil {
 		problemDetails := openapi.ProblemDetailsSystemFailure(err.Error())
@@ -644,7 +773,7 @@ func (p *Processor) SubscribeProcedure(c *gin.Context, sdmSubscription *models.S
 	createSdmSubscriptionsRequest.SdmSubscription = sdmSubscription
 	createSdmSubscriptionsRequest.UeId = &supi
 	sdmSubscriptionResp, err := clientAPI.SDMSubscriptionsCollectionApi.CreateSdmSubscriptions(
-		ctx, &createSdmSubscriptionsRequest)
+		ctxForHTTP, &createSdmSubscriptionsRequest) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -668,19 +797,31 @@ func (p *Processor) SubscribeProcedure(c *gin.Context, sdmSubscription *models.S
 	c.JSON(http.StatusCreated, sdmSubscriptionResp.SdmSubscription)
 }
 
-func (p *Processor) UnsubscribeForSharedDataProcedure(c *gin.Context, subscriptionID string) {
+func (p *Processor) UnsubscribeForSharedDataProcedure(baseCtx context.Context, c *gin.Context, subscriptionID string) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UnsubscribeForSharedDataProcedure")
+	span.SetAttributes(
+		attribute.String("subscriptionID", subscriptionID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 
 	udmClientAPI := p.Consumer().GetSDMClient("unsubscribeForSharedData")
 	var unsubscribeForSharedDataRequest SubscriberDataManagement.UnsubscribeForSharedDataRequest
 	unsubscribeForSharedDataRequest.SubscriptionId = &subscriptionID
 	_, err = udmClientAPI.SubscriptionDeletionForSharedDataApi.UnsubscribeForSharedData(
-		ctx, &unsubscribeForSharedDataRequest)
+		ctxForHTTP, &unsubscribeForSharedDataRequest) //add
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if subToShareDataErr, ok2 := apiErr.Model().(SubscriberDataManagement.UnsubscribeForSharedDataError); ok2 {
@@ -699,13 +840,27 @@ func (p *Processor) UnsubscribeForSharedDataProcedure(c *gin.Context, subscripti
 	c.Status(http.StatusNoContent)
 }
 
-func (p *Processor) UnsubscribeProcedure(c *gin.Context, supi string, subscriptionID string) {
+func (p *Processor) UnsubscribeProcedure(baseCtx context.Context, c *gin.Context, supi string, subscriptionID string) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UnsubscribeProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("subscriptionID", subscriptionID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	clientAPI, err := p.Consumer().CreateUDMClientToUDR(supi)
 	if err != nil {
 		problemDetails := openapi.ProblemDetailsSystemFailure(err.Error())
@@ -716,7 +871,7 @@ func (p *Processor) UnsubscribeProcedure(c *gin.Context, supi string, subscripti
 	var removesdmSubscriptionRequest Nudr_DataRepository.RemovesdmSubscriptionsRequest
 	removesdmSubscriptionRequest.UeId = &supi
 	removesdmSubscriptionRequest.SubsId = &subscriptionID
-	_, err = clientAPI.SDMSubscriptionDocumentApi.RemovesdmSubscriptions(ctx, &removesdmSubscriptionRequest)
+	_, err = clientAPI.SDMSubscriptionDocumentApi.RemovesdmSubscriptions(ctxForHTTP, &removesdmSubscriptionRequest) //add
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if removeSubErr, ok2 := apiErr.Model().(Nudr_DataRepository.RemovesdmSubscriptionsError); ok2 {
@@ -735,17 +890,33 @@ func (p *Processor) UnsubscribeProcedure(c *gin.Context, supi string, subscripti
 	c.Status(http.StatusNoContent)
 }
 
-func (p *Processor) ModifyProcedure(c *gin.Context,
+func (p *Processor) ModifyProcedure(
+	baseCtx context.Context, //add
+	c *gin.Context,
 	sdmSubsModification *models.SdmSubsModification,
 	supi string,
 	subscriptionID string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM ModifyProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("subscriptionID", subscriptionID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	clientAPI, err := p.Consumer().CreateUDMClientToUDR(supi)
 	if err != nil {
 		problemDetails := openapi.ProblemDetailsSystemFailure(err.Error())
@@ -761,7 +932,7 @@ func (p *Processor) ModifyProcedure(c *gin.Context,
 	updatesdmsubscriptionsRequest.UeId = &supi
 
 	_, err = clientAPI.SDMSubscriptionDocumentApi.Updatesdmsubscriptions(
-		ctx, &updatesdmsubscriptionsRequest)
+		ctxForHTTP, &updatesdmsubscriptionsRequest) //add
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if updateSubErr, ok2 := apiErr.Model().(Nudr_DataRepository.UpdatesdmsubscriptionsError); ok2 {
@@ -782,17 +953,34 @@ func (p *Processor) ModifyProcedure(c *gin.Context,
 
 // TS 29.503 5.2.2.7.3
 // Modification of a subscription to notifications of shared data change
-func (p *Processor) ModifyForSharedDataProcedure(c *gin.Context,
+func (p *Processor) ModifyForSharedDataProcedure(
+	baseCtx context.Context, //add
+	c *gin.Context,
 	sdmSubsModification *models.SdmSubsModification,
 	supi string,
 	subscriptionID string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM ModifyForSharedDataProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("subscriptionID", subscriptionID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	clientAPI, err := p.Consumer().CreateUDMClientToUDR(supi)
 	if err != nil {
 		problemDetails := openapi.ProblemDetailsSystemFailure(err.Error())
@@ -809,7 +997,7 @@ func (p *Processor) ModifyForSharedDataProcedure(c *gin.Context,
 	updatesdmsubscriptionsRequest.SdmSubscription = &sdmSubs
 
 	_, err = clientAPI.SDMSubscriptionDocumentApi.Updatesdmsubscriptions(
-		ctx, &updatesdmsubscriptionsRequest)
+		ctxForHTTP, &updatesdmsubscriptionsRequest) //add
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if updateShareSubErr, ok2 := apiErr.Model().(Nudr_DataRepository.UpdatesdmsubscriptionsError); ok2 {
@@ -828,13 +1016,26 @@ func (p *Processor) ModifyForSharedDataProcedure(c *gin.Context,
 	c.JSON(http.StatusOK, sdmSubscription)
 }
 
-func (p *Processor) GetTraceDataProcedure(c *gin.Context, supi string, plmnID string) {
+func (p *Processor) GetTraceDataProcedure(baseCtx context.Context, c *gin.Context, supi string, plmnID string) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM GetTraceDataProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	var body models.TraceData
 	var queryTraceDataRequest Nudr_DataRepository.QueryTraceDataRequest
 	queryTraceDataRequest.UeId = &supi
@@ -851,7 +1052,7 @@ func (p *Processor) GetTraceDataProcedure(c *gin.Context, supi string, plmnID st
 	p.Context().CreateTraceDataforUe(supi, body)
 
 	traceDataRes, err := clientAPI.TraceDataDocumentApi.QueryTraceData(
-		ctx, &queryTraceDataRequest)
+		ctxForHTTP, &queryTraceDataRequest) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -875,7 +1076,7 @@ func (p *Processor) GetTraceDataProcedure(c *gin.Context, supi string, plmnID st
 	c.JSON(http.StatusOK, udmUe.TraceDataResponse.TraceData)
 }
 
-func (p *Processor) GetUeContextInSmfDataProcedure(c *gin.Context, supi string, supportedFeatures string) {
+func (p *Processor) GetUeContextInSmfDataProcedure(baseCtx context.Context, c *gin.Context, supi string, supportedFeatures string) {
 	var body models.UeContextInSmfData
 	var ueContextInSmfData models.UeContextInSmfData
 	var pgwInfoArray []models.PgwInfo
@@ -894,15 +1095,28 @@ func (p *Processor) GetUeContextInSmfDataProcedure(c *gin.Context, supi string, 
 	pduSessionMap := make(map[string]models.PduSession)
 	p.Context().CreateUeContextInSmfDataforUe(supi, body)
 
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM GetUeContextInSmfDataProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("supported_features", supportedFeatures),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 
 	pdusessRes, err := clientAPI.SMFRegistrationsCollectionApi.QuerySmfRegList(
-		ctx, &querySmfRegListRequest)
+		ctxForHTTP, &querySmfRegListRequest) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {

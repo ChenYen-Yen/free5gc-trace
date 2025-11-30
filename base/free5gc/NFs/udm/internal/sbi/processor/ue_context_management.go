@@ -12,16 +12,37 @@ import (
 	udm_context "github.com/free5gc/udm/internal/context"
 	"github.com/free5gc/udm/internal/logger"
 	"github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"context"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ue_context_managemanet_service
-func (p *Processor) GetAmf3gppAccessProcedure(c *gin.Context, ueID string, supportedFeatures string) {
+func (p *Processor) GetAmf3gppAccessProcedure(baseCtx context.Context, c *gin.Context, ueID string, supportedFeatures string) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UECM GetAmf3gppAccessProcedure")
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("ue.id", ueID),
+		attribute.String("supported_features", supportedFeatures),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	var queryAmfContext3gppRequest Nudr_DataRepository.QueryAmfContext3gppRequest
 	queryAmfContext3gppRequest.UeId = &ueID
 	queryAmfContext3gppRequest.SupportedFeatures = &supportedFeatures
@@ -35,7 +56,7 @@ func (p *Processor) GetAmf3gppAccessProcedure(c *gin.Context, ueID string, suppo
 	}
 
 	amf3GppAccessRegistration, err := clientAPI.AMF3GPPAccessRegistrationDocumentApi.
-		QueryAmfContext3gpp(ctx, &queryAmfContext3gppRequest)
+		QueryAmfContext3gpp(ctxForHTTP, &queryAmfContext3gppRequest) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -52,10 +73,24 @@ func (p *Processor) GetAmf3gppAccessProcedure(c *gin.Context, ueID string, suppo
 	c.JSON(http.StatusOK, amf3GppAccessRegistration.Amf3GppAccessRegistration)
 }
 
-func (p *Processor) GetAmfNon3gppAccessProcedure(c *gin.Context, queryAmfContextNon3gppParamOpts Nudr_DataRepository.
+func (p *Processor) GetAmfNon3gppAccessProcedure(baseCtx context.Context, c *gin.Context, queryAmfContextNon3gppParamOpts Nudr_DataRepository.
 	QueryAmfContextNon3gppRequest, ueID string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UECM GetAmfNon3gppAccessProcedure")
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("ue.id", ueID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
@@ -68,7 +103,7 @@ func (p *Processor) GetAmfNon3gppAccessProcedure(c *gin.Context, queryAmfContext
 		return
 	}
 	amfNon3GppAccessRegistrationResponse, err := clientAPI.AMFNon3GPPAccessRegistrationDocumentApi.
-		QueryAmfContextNon3gpp(ctx, &queryAmfContextNon3gppParamOpts)
+		QueryAmfContextNon3gpp(ctxForHTTP, &queryAmfContextNon3gppParamOpts) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -85,16 +120,29 @@ func (p *Processor) GetAmfNon3gppAccessProcedure(c *gin.Context, queryAmfContext
 	c.JSON(http.StatusOK, amfNon3GppAccessRegistrationResponse.AmfNon3GppAccessRegistration)
 }
 
-func (p *Processor) RegistrationAmf3gppAccessProcedure(c *gin.Context,
+func (p *Processor) RegistrationAmf3gppAccessProcedure(baseCtx context.Context, c *gin.Context,
 	registerRequest models.Amf3GppAccessRegistration,
 	ueID string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UECM RegistrationAmf3gppAccessProcedure")
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("ue.id", ueID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	// TODO: EPS interworking with N26 is not supported yet in this stage
 	var oldAmf3GppAccessRegContext *models.Amf3GppAccessRegistration
 	var ue *udm_context.UdmUeContext
@@ -117,7 +165,7 @@ func (p *Processor) RegistrationAmf3gppAccessProcedure(c *gin.Context,
 	var createAmfContext3gppRequest Nudr_DataRepository.CreateAmfContext3gppRequest
 	createAmfContext3gppRequest.UeId = &ueID
 	createAmfContext3gppRequest.Amf3GppAccessRegistration = &registerRequest
-	_, err = clientAPI.AMF3GPPAccessRegistrationDocumentApi.CreateAmfContext3gpp(ctx,
+	_, err = clientAPI.AMF3GPPAccessRegistrationDocumentApi.CreateAmfContext3gpp(ctxForHTTP, //add
 		&createAmfContext3gppRequest)
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
@@ -150,7 +198,7 @@ func (p *Processor) RegistrationAmf3gppAccessProcedure(c *gin.Context,
 
 			go func() {
 				logger.UecmLog.Infof("Send DeregNotify to old AMF GUAMI=%v", oldAmf3GppAccessRegContext.Guami)
-				pd := p.SendOnDeregistrationNotification(ueID,
+				pd := p.SendOnDeregistrationNotification(ctxForHTTP, ueID, //add
 					oldAmf3GppAccessRegContext.DeregCallbackUri,
 					deregistData) // Deregistration Notify Triggered
 				if pd != nil {
@@ -167,16 +215,28 @@ func (p *Processor) RegistrationAmf3gppAccessProcedure(c *gin.Context,
 	}
 }
 
-func (p *Processor) RegisterAmfNon3gppAccessProcedure(c *gin.Context,
+func (p *Processor) RegisterAmfNon3gppAccessProcedure(baseCtx context.Context, c *gin.Context,
 	registerRequest models.AmfNon3GppAccessRegistration,
 	ueID string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UECM RegisterAmfNon3gppAccessProcedure")
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("ue.id", ueID),
+	)
+	defer span.End()
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	var oldAmfNon3GppAccessRegContext *models.AmfNon3GppAccessRegistration
 	if p.Context().UdmAmfNon3gppRegContextExists(ueID) {
 		ue, _ := p.Context().UdmUeFindBySupi(ueID)
@@ -198,7 +258,7 @@ func (p *Processor) RegisterAmfNon3gppAccessProcedure(c *gin.Context,
 	createAmfContextNon3gppRequest.AmfNon3GppAccessRegistration = &registerRequest
 
 	_, err = clientAPI.AMFNon3GPPAccessRegistrationDocumentApi.CreateAmfContextNon3gpp(
-		ctx, &createAmfContextNon3gppRequest)
+		ctxForHTTP, &createAmfContextNon3gppRequest) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -222,7 +282,7 @@ func (p *Processor) RegisterAmfNon3gppAccessProcedure(c *gin.Context,
 
 		go func() {
 			logger.UecmLog.Infof("Send DeregNotify to old AMF GUAMI=%v", oldAmfNon3GppAccessRegContext.Guami)
-			pd := p.SendOnDeregistrationNotification(ueID, oldAmfNon3GppAccessRegContext.DeregCallbackUri,
+			pd := p.SendOnDeregistrationNotification(ctxForHTTP, ueID, oldAmfNon3GppAccessRegContext.DeregCallbackUri, //add
 				deregistData) // Deregistration Notify Triggered
 			if pd != nil {
 				logger.UecmLog.Errorf("RegisterAmfNon3gppAccess: send DeregNotify fail %v", pd)
@@ -237,16 +297,31 @@ func (p *Processor) RegisterAmfNon3gppAccessProcedure(c *gin.Context,
 	}
 }
 
-func (p *Processor) UpdateAmf3gppAccessProcedure(c *gin.Context,
+func (p *Processor) UpdateAmf3gppAccessProcedure(
+	baseCtx context.Context,
+	c *gin.Context,
 	request models.Amf3GppAccessRegistrationModification,
 	ueID string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UECM UpdateAmf3gppAccessProcedure")
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("ue.id", ueID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	var patchItemReqArray []models.PatchItem
 	currentContext := p.Context().GetAmf3gppRegContext(ueID)
 	if currentContext == nil {
@@ -326,7 +401,7 @@ func (p *Processor) UpdateAmf3gppAccessProcedure(c *gin.Context,
 	var amfContext3gppRequest Nudr_DataRepository.AmfContext3gppRequest
 	amfContext3gppRequest.UeId = &ueID
 	amfContext3gppRequest.PatchItem = patchItemReqArray
-	_, err = clientAPI.AMF3GPPAccessRegistrationDocumentApi.AmfContext3gpp(ctx,
+	_, err = clientAPI.AMF3GPPAccessRegistrationDocumentApi.AmfContext3gpp(ctxForHTTP, //add
 		&amfContext3gppRequest)
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
@@ -351,16 +426,32 @@ func (p *Processor) UpdateAmf3gppAccessProcedure(c *gin.Context,
 	c.Status(http.StatusNoContent)
 }
 
-func (p *Processor) UpdateAmfNon3gppAccessProcedure(c *gin.Context,
+func (p *Processor) UpdateAmfNon3gppAccessProcedure(
+	baseCtx context.Context, //add
+	c *gin.Context,
 	request models.AmfNon3GppAccessRegistrationModification,
 	ueID string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UECM UpdateAmfNon3gppAccessProcedure")
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("ue.id", ueID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	var patchItemReqArray []models.PatchItem
 	currentContext := p.Context().GetAmfNon3gppRegContext(ueID)
 	if currentContext == nil {
@@ -439,7 +530,7 @@ func (p *Processor) UpdateAmfNon3gppAccessProcedure(c *gin.Context,
 	var amfContextNon3gppRequest Nudr_DataRepository.AmfContextNon3gppRequest
 	amfContextNon3gppRequest.UeId = &ueID
 	amfContextNon3gppRequest.PatchItem = patchItemReqArray
-	_, err = clientAPI.AMFNon3GPPAccessRegistrationDocumentApi.AmfContextNon3gpp(ctx,
+	_, err = clientAPI.AMFNon3GPPAccessRegistrationDocumentApi.AmfContextNon3gpp(ctxForHTTP, //add
 		&amfContextNon3gppRequest)
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
@@ -459,10 +550,24 @@ func (p *Processor) UpdateAmfNon3gppAccessProcedure(c *gin.Context,
 	c.Status(http.StatusNoContent)
 }
 
-func (p *Processor) DeregistrationSmfRegistrationsProcedure(c *gin.Context,
+func (p *Processor) DeregistrationSmfRegistrationsProcedure(
+	baseCtx context.Context, //add
+	c *gin.Context,
 	ueID string,
 	pduSessionID string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UECM DeregistrationSmfRegistrationsProcedure")
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("ue.id", ueID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
@@ -470,6 +575,7 @@ func (p *Processor) DeregistrationSmfRegistrationsProcedure(c *gin.Context,
 		return
 	}
 
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	clientAPI, err := p.Consumer().CreateUDMClientToUDR(ueID)
 	if err != nil {
 		problemDetails := openapi.ProblemDetailsSystemFailure(err.Error())
@@ -491,7 +597,7 @@ func (p *Processor) DeregistrationSmfRegistrationsProcedure(c *gin.Context,
 	var deleteSmfRegistrationRequest Nudr_DataRepository.DeleteSmfRegistrationRequest
 	deleteSmfRegistrationRequest.UeId = &ueID
 	deleteSmfRegistrationRequest.PduSessionId = &pduSessionIDInt32
-	_, err = clientAPI.SMFRegistrationDocumentApi.DeleteSmfRegistration(ctx, &deleteSmfRegistrationRequest)
+	_, err = clientAPI.SMFRegistrationDocumentApi.DeleteSmfRegistration(ctxForHTTP, &deleteSmfRegistrationRequest) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -509,17 +615,31 @@ func (p *Processor) DeregistrationSmfRegistrationsProcedure(c *gin.Context,
 }
 
 func (p *Processor) RegistrationSmfRegistrationsProcedure(
+	baseCtx context.Context, //add
 	c *gin.Context,
 	smfRegistration *models.SmfRegistration,
 	ueID string,
 	pduSessionID string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UECM RegistrationSmfRegistrationsProcedure")
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("ue.id", ueID),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	contextExisted := false
 	p.Context().CreateSmfRegContext(ueID, pduSessionID)
 	if !p.Context().UdmSmfRegContextNotExists(ueID) {
@@ -544,7 +664,7 @@ func (p *Processor) RegistrationSmfRegistrationsProcedure(
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
 	}
-	_, err = clientAPI.SMFRegistrationDocumentApi.CreateOrUpdateSmfRegistration(ctx, &createSmfContext3gppRequest)
+	_, err = clientAPI.SMFRegistrationDocumentApi.CreateOrUpdateSmfRegistration(ctxForHTTP, &createSmfContext3gppRequest) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {

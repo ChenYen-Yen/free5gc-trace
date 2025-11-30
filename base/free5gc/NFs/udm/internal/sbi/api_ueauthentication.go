@@ -9,6 +9,10 @@ import (
 	"github.com/free5gc/openapi/models"
 	"github.com/free5gc/udm/internal/logger"
 	"github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func (s *Server) getUEAuthenticationRoutes() []Route {
@@ -57,7 +61,19 @@ func (s *Server) HandleConfirmAuth(c *gin.Context) {
 
 	logger.UeauLog.Infoln("Handle ConfirmAuthDataRequest")
 
-	s.Processor().ConfirmAuthDataProcedure(c, authEvent, supi)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_UEAU_ConfirmAuth"),
+		attribute.String("ue.supi", supi),
+		attribute.String("serving_network", authEvent.ServingNetworkName),
+		attribute.String("auth.type", string(authEvent.AuthType)),
+		attribute.Bool("auth.success", authEvent.Success),
+	)
+
+	s.Processor().ConfirmAuthDataProcedure(ctx, c, authEvent, supi)
 }
 
 // GenerateAuthData - Generate authentication data for the UE
@@ -96,7 +112,17 @@ func (s *Server) HandleGenerateAuthData(c *gin.Context) {
 
 	supiOrSuci := c.Param("supiOrSuci")
 
-	s.Processor().GenerateAuthDataProcedure(c, authInfoReq, supiOrSuci)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_UEAU_GenerateAuthData"),
+		attribute.String("ue.id", supiOrSuci), // 這裡暫時還是 SUCI 或 SUPI
+		attribute.String("serving_network", authInfoReq.ServingNetworkName),
+	)
+
+	s.Processor().GenerateAuthDataProcedure(ctx, c, authInfoReq, supiOrSuci)
 }
 
 func (s *Server) HandleDeleteAuth(c *gin.Context) {

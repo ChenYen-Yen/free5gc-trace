@@ -12,6 +12,10 @@ import (
 	"github.com/free5gc/openapi/models"
 	"github.com/free5gc/udm/internal/logger"
 	"github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func (s *Server) getSubscriberDataManagementRoutes() []Route {
@@ -35,59 +39,48 @@ func (s *Server) HandleGetAmData(c *gin.Context) {
 
 	supi := c.Params.ByName("supi")
 
-	// use c.Request.URL.Query() only for getPlmnIDStruct
-	plmnIDStruct, problemDetails := s.getPlmnIDStruct(c.Request.URL.Query())
+	plmnIDStruct, problemDetails := s.getPlmnIDStruct(query)
 	if problemDetails != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
 	}
-
-	var plmnID string
-	if plmnIDStruct != nil {
-		plmnID = plmnIDStruct.Mcc + plmnIDStruct.Mnc
-	}
+	plmnID := plmnIDStruct.Mcc + plmnIDStruct.Mnc
 	supportedFeatures := query.Get("supported-features")
 
-	s.Processor().GetAmDataProcedure(c, supi, plmnID, supportedFeatures)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_GetAmData"),
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+		attribute.String("supported_features", supportedFeatures),
+	)
+
+	s.Processor().GetAmDataProcedure(ctx, c, supi, plmnID, supportedFeatures)
 }
 
 func (s *Server) getPlmnIDStruct(
 	queryParameters url.Values,
 ) (plmnIDStruct *models.PlmnId, problemDetails *models.ProblemDetails) {
-	values, exists := queryParameters["plmn-id"]
-	if !exists {
-		// not exist like: http:{ip:port}/api/.../
-		return nil, nil
-	}
-	if len(values) == 0 || strings.TrimSpace(values[0]) == "" {
-		// exist but it is empty like: http:{ip:port}/api/.../?plmn-id=
-		problemDetails = &models.ProblemDetails{
+	if queryParameters["plmn-id"] != nil {
+		plmnIDJson := queryParameters["plmn-id"][0]
+		plmnIDStruct := &models.PlmnId{}
+		err := json.Unmarshal([]byte(plmnIDJson), plmnIDStruct)
+		if err != nil {
+			logger.SdmLog.Warnln("Unmarshal Error in targetPlmnListtruct: ", err)
+		}
+		return plmnIDStruct, nil
+	} else {
+		problemDetails := &models.ProblemDetails{
 			Title:  "Invalid Parameter",
 			Status: http.StatusBadRequest,
-			Cause:  "plmn-id parameter cannot be empty",
+			Cause:  "No get plmn-id",
 		}
 		return nil, problemDetails
 	}
-
-	// exist and not empty link: http:{ip:port}/api/.../?plmn-id=xxx
-	plmnIDJson := values[0]
-	plmnIDStruct = &models.PlmnId{}
-	err := json.Unmarshal([]byte(plmnIDJson), plmnIDStruct)
-	if err != nil {
-		logger.SdmLog.Warnln("Unmarshal Error in targetPlmnListtruct: ", err)
-		problemDetails = &models.ProblemDetails{
-			Title:  "Invalid Parameter",
-			Status: http.StatusBadRequest,
-			Cause:  "Failed to parse plmn-id JSON",
-			InvalidParams: []models.InvalidParam{{
-				Param:  "plmn-id",
-				Reason: err.Error(),
-			}},
-		}
-		return nil, problemDetails
-	}
-	return plmnIDStruct, nil
 }
 
 // Info - Nudm_Sdm Info service operation
@@ -109,20 +102,27 @@ func (s *Server) HandleGetSmfSelectData(c *gin.Context) {
 	logger.SdmLog.Infof("Handle GetSmfSelectData")
 
 	supi := c.Params.ByName("supi")
-	// use c.Request.URL.Query() only for getPlmnIDStruct
-	plmnIDStruct, problemDetails := s.getPlmnIDStruct(c.Request.URL.Query())
+	plmnIDStruct, problemDetails := s.getPlmnIDStruct(query)
 	if problemDetails != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
 	}
-	var plmnID string
-	if plmnIDStruct != nil {
-		plmnID = plmnIDStruct.Mcc + plmnIDStruct.Mnc
-	}
+	plmnID := plmnIDStruct.Mcc + plmnIDStruct.Mnc
 	supportedFeatures := query.Get("supported-features")
 
-	s.Processor().GetSmfSelectDataProcedure(c, supi, plmnID, supportedFeatures)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_GetSmfSelectData"),
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+		attribute.String("supported_features", supportedFeatures),
+	)
+
+	s.Processor().GetSmfSelectDataProcedure(ctx, c, supi, plmnID, supportedFeatures)
 }
 
 // GetSmsMngData - retrieve a UE's SMS Management Subscription Data
@@ -145,21 +145,29 @@ func (s *Server) HandleGetSupi(c *gin.Context) {
 	logger.SdmLog.Infof("Handle GetSupiRequest")
 
 	supi := c.Params.ByName("supi")
-	// use c.Request.URL.Query() only for getPlmnIDStruct
-	plmnIDStruct, problemDetails := s.getPlmnIDStruct(c.Request.URL.Query())
+	plmnIDStruct, problemDetails := s.getPlmnIDStruct(query)
 	if problemDetails != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
 	}
-	var plmnID string
-	if plmnIDStruct != nil {
-		plmnID = plmnIDStruct.Mcc + plmnIDStruct.Mnc
-	}
+	plmnID := plmnIDStruct.Mcc + plmnIDStruct.Mnc
 	dataSetNames := strings.Split(query.Get("dataset-names"), ",")
 	supportedFeatures := query.Get("supported-features")
 
-	s.Processor().GetSupiProcedure(c, supi, plmnID, dataSetNames, supportedFeatures)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_GetDataSets"),
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+		attribute.String("dataset_names", strings.Join(dataSetNames, ",")),
+		attribute.String("supported_features", supportedFeatures),
+	)
+
+	s.Processor().GetSupiProcedure(ctx, c, supi, plmnID, dataSetNames, supportedFeatures)
 }
 
 // GetSharedData - retrieve shared data
@@ -174,7 +182,17 @@ func (s *Server) HandleGetSharedData(c *gin.Context) {
 		supportedFeature = supportedFeatures[0]
 	}
 
-	s.Processor().GetSharedDataProcedure(c, sharedDataIds, supportedFeature)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_GetSharedData"),
+		attribute.String("shared_data_ids", strings.Join(sharedDataIds, ",")),
+		attribute.String("supported_features", supportedFeature),
+	)
+
+	s.Processor().GetSharedDataProcedure(ctx, c, sharedDataIds, supportedFeature)
 }
 
 // SubscribeToSharedData - subscribe to notifications for shared data
@@ -211,7 +229,15 @@ func (s *Server) HandleSubscribeToSharedData(c *gin.Context) {
 
 	logger.SdmLog.Infof("Handle SubscribeToSharedData")
 
-	s.Processor().SubscribeToSharedDataProcedure(c, &sharedDataSubsReq)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_SubscribeToSharedData"),
+	)
+
+	s.Processor().SubscribeToSharedDataProcedure(ctx, c, &sharedDataSubsReq)
 }
 
 // Subscribe - subscribe to notifications
@@ -249,7 +275,17 @@ func (s *Server) HandleSubscribe(c *gin.Context) {
 	logger.SdmLog.Infof("Handle Subscribe")
 
 	supi := c.Params.ByName("supi")
-	s.Processor().SubscribeProcedure(c, &sdmSubscriptionReq, supi)
+
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_Subscribe"),
+		attribute.String("ue.supi", supi),
+	)
+
+	s.Processor().SubscribeProcedure(ctx, c, &sdmSubscriptionReq, supi)
 }
 
 // Unsubscribe - unsubscribe from notifications
@@ -259,7 +295,17 @@ func (s *Server) HandleUnsubscribe(c *gin.Context) {
 	supi := c.Params.ByName("ueId")
 	subscriptionID := c.Params.ByName("subscriptionId")
 
-	s.Processor().UnsubscribeProcedure(c, supi, subscriptionID)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_Unsubscribe"),
+		attribute.String("ue.supi", supi),
+		attribute.String("subscription_id", subscriptionID),
+	)
+
+	s.Processor().UnsubscribeProcedure(ctx, c, supi, subscriptionID)
 }
 
 // UnsubscribeForSharedData - unsubscribe from notifications for shared data
@@ -267,7 +313,17 @@ func (s *Server) HandleUnsubscribeForSharedData(c *gin.Context) {
 	logger.SdmLog.Infof("Handle UnsubscribeForSharedData")
 
 	subscriptionID := c.Params.ByName("subscriptionId")
-	s.Processor().UnsubscribeForSharedDataProcedure(c, subscriptionID)
+
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_UnsubscribeForSharedData"),
+		attribute.String("subscription_id", subscriptionID),
+	)
+
+	s.Processor().UnsubscribeForSharedDataProcedure(ctx, c, subscriptionID)
 }
 
 // Modify - modify the subscription
@@ -306,7 +362,17 @@ func (s *Server) HandleModify(c *gin.Context) {
 	supi := c.Params.ByName("ueId")
 	subscriptionID := c.Params.ByName("subscriptionId")
 
-	s.Processor().ModifyProcedure(c, &sdmSubsModificationReq, supi, subscriptionID)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_Modify"),
+		attribute.String("ue.supi", supi),
+		attribute.String("subscription_id", subscriptionID),
+	)
+
+	s.Processor().ModifyProcedure(ctx, c, &sdmSubsModificationReq, supi, subscriptionID)
 }
 
 // ModifyForSharedData - modify the subscription
@@ -345,7 +411,17 @@ func (s *Server) HandleModifyForSharedData(c *gin.Context) {
 	supi := c.Params.ByName("supi")
 	subscriptionID := c.Params.ByName("subscriptionId")
 
-	s.Processor().ModifyForSharedDataProcedure(c, &sharedDataSubscriptions, supi, subscriptionID)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_ModifyForSharedData"),
+		attribute.String("ue.supi", supi),
+		attribute.String("subscription_id", subscriptionID),
+	)
+
+	s.Processor().ModifyForSharedDataProcedure(ctx, c, &sharedDataSubscriptions, supi, subscriptionID)
 }
 
 // GetTraceData - retrieve a UE's Trace Configuration Data
@@ -355,7 +431,17 @@ func (s *Server) HandleGetTraceData(c *gin.Context) {
 	supi := c.Params.ByName("supi")
 	plmnID := c.Query("plmn-id")
 
-	s.Processor().GetTraceDataProcedure(c, supi, plmnID)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_GetTraceData"),
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+	)
+
+	s.Processor().GetTraceDataProcedure(ctx, c, supi, plmnID)
 }
 
 // GetUeContextInSmfData - retrieve a UE's UE Context In SMF Data
@@ -365,7 +451,17 @@ func (s *Server) HandleGetUeContextInSmfData(c *gin.Context) {
 	supi := c.Params.ByName("supi")
 	supportedFeatures := c.Query("supported-features")
 
-	s.Processor().GetUeContextInSmfDataProcedure(c, supi, supportedFeatures)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_GetUeContextInSmfData"),
+		attribute.String("ue.supi", supi),
+		attribute.String("supported_features", supportedFeatures),
+	)
+
+	s.Processor().GetUeContextInSmfDataProcedure(ctx, c, supi, supportedFeatures)
 }
 
 // GetUeContextInSmsfData - retrieve a UE's UE Context In SMSF Data
@@ -382,20 +478,27 @@ func (s *Server) HandleGetNssai(c *gin.Context) {
 	logger.SdmLog.Infof("Handle GetNssai")
 
 	supi := c.Params.ByName("supi")
-	// use c.Request.URL.Query() only for getPlmnIDStruct
-	plmnIDStruct, problemDetails := s.getPlmnIDStruct(c.Request.URL.Query())
+	plmnIDStruct, problemDetails := s.getPlmnIDStruct(query)
 	if problemDetails != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
 	}
-	var plmnID string
-	if plmnIDStruct != nil {
-		plmnID = plmnIDStruct.Mcc + plmnIDStruct.Mnc
-	}
+	plmnID := plmnIDStruct.Mcc + plmnIDStruct.Mnc
 	supportedFeatures := query.Get("supported-features")
 
-	s.Processor().GetNssaiProcedure(c, supi, plmnID, supportedFeatures)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_GetNssai"),
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+		attribute.String("supported_features", supportedFeatures),
+	)
+
+	s.Processor().GetNssaiProcedure(ctx, c, supi, plmnID, supportedFeatures)
 }
 
 // GetSmData - retrieve a UE's Session Management Subscription Data
@@ -409,22 +512,31 @@ func (s *Server) HandleGetSmData(c *gin.Context) {
 	logger.SdmLog.Infof("Handle GetSmData")
 
 	supi := c.Params.ByName("supi")
-	// use c.Request.URL.Query() only for getPlmnIDStruct
-	plmnIDStruct, problemDetails := s.getPlmnIDStruct(c.Request.URL.Query())
+	plmnIDStruct, problemDetails := s.getPlmnIDStruct(query)
 	if problemDetails != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
 	}
-	var plmnID string
-	if plmnIDStruct != nil {
-		plmnID = plmnIDStruct.Mcc + plmnIDStruct.Mnc
-	}
+	plmnID := plmnIDStruct.Mcc + plmnIDStruct.Mnc
 	Dnn := query.Get("dnn")
 	Snssai := query.Get("single-nssai")
 	supportedFeatures := query.Get("supported-features")
 
-	s.Processor().GetSmDataProcedure(c, supi, plmnID, Dnn, Snssai, supportedFeatures)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_GetSmData"),
+		attribute.String("ue.supi", supi),
+		attribute.String("plmn", plmnID),
+		attribute.String("dnn", Dnn),
+		attribute.String("snssai", Snssai),
+		attribute.String("supported_features", supportedFeatures),
+	)
+
+	s.Processor().GetSmDataProcedure(ctx, c, supi, plmnID, Dnn, Snssai, supportedFeatures)
 }
 
 // GetIdTranslationResult - retrieve a UE's SUPI
@@ -435,7 +547,16 @@ func (s *Server) HandleGetIdTranslationResult(c *gin.Context) {
 
 	gpsi := c.Params.ByName("ueId")
 
-	s.Processor().GetIdTranslationResultProcedure(c, gpsi)
+	//add
+	ctx := c.Request.Context()
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("nf", "udm"),
+		attribute.String("api", "Nudm_SDM_GetIdTranslationResult"),
+		attribute.String("ue.gpsi", gpsi),
+	)
+
+	s.Processor().GetIdTranslationResultProcedure(ctx, c, gpsi)
 }
 
 func (s *Server) HandleGetMultipleIdentifiers(c *gin.Context) {

@@ -249,7 +249,9 @@ func (s *Server) HandleGetAmfNon3gppAccess(c *gin.Context) {
 	var queryAmfContextNon3gppRequest Nudr_DataRepository.QueryAmfContextNon3gppRequest
 	queryAmfContextNon3gppRequest.SupportedFeatures = &supportedFeatures
 	queryAmfContextNon3gppRequest.UeId = &ueId
-	s.Processor().GetAmfNon3gppAccessProcedure(c, queryAmfContextNon3gppRequest, ueId)
+	//add
+	ctx := c.Request.Context()
+	s.Processor().GetAmfNon3gppAccessProcedure(ctx, c, queryAmfContextNon3gppRequest, ueId)
 }
 
 // Register - register as AMF for non-3GPP access
@@ -288,7 +290,9 @@ func (s *Server) HandleRegistrationAmfNon3gppAccess(c *gin.Context) {
 
 	ueID := c.Param("ueId")
 
-	s.Processor().RegisterAmfNon3gppAccessProcedure(c, amfNon3GppAccessRegistration, ueID)
+	//add
+	ctx := c.Request.Context()
+	s.Processor().RegisterAmfNon3gppAccessProcedure(ctx, c, amfNon3GppAccessRegistration, ueID)
 }
 
 // RegistrationAmf3gppAccess - register as AMF for 3GPP access
@@ -327,7 +331,9 @@ func (s *Server) HandleRegistrationAmf3gppAccess(c *gin.Context) {
 	ueID := c.Param("ueId")
 	logger.UecmLog.Info("UEID: ", ueID)
 
-	s.Processor().RegistrationAmf3gppAccessProcedure(c, amf3GppAccessRegistration, ueID)
+	//add
+	ctx := c.Request.Context()
+	s.Processor().RegistrationAmf3gppAccessProcedure(ctx, c, amf3GppAccessRegistration, ueID)
 }
 
 // UpdateAmfNon3gppAccess - update a parameter in the AMF registration for non-3GPP access
@@ -365,7 +371,9 @@ func (s *Server) HandleUpdateAmfNon3gppAccess(c *gin.Context) {
 
 	ueID := c.Param("ueId")
 
-	s.Processor().UpdateAmfNon3gppAccessProcedure(c, amfNon3GppAccessRegistrationModification, ueID)
+	//add
+	ctx := c.Request.Context()
+	s.Processor().UpdateAmfNon3gppAccessProcedure(ctx, c, amfNon3GppAccessRegistrationModification, ueID)
 }
 
 // UpdateAmf3gppAccess - Update a parameter in the AMF registration for 3GPP access
@@ -404,7 +412,9 @@ func (s *Server) HandleUpdateAmf3gppAccess(c *gin.Context) {
 
 	ueID := c.Param("ueId")
 
-	s.Processor().UpdateAmf3gppAccessProcedure(c, amf3GppAccessRegistrationModification, ueID)
+	//add
+	ctx := c.Request.Context()
+	s.Processor().UpdateAmf3gppAccessProcedure(ctx, c, amf3GppAccessRegistrationModification, ueID)
 }
 
 // DeregistrationSmsfNon3gppAccess - delete SMSF registration for non 3GPP access
@@ -444,7 +454,9 @@ func (s *Server) HandleDeregistrationSmfRegistrations(c *gin.Context) {
 	ueID := c.Params.ByName("ueId")
 	pduSessionID := c.Params.ByName("pduSessionId")
 
-	s.Processor().DeregistrationSmfRegistrationsProcedure(c, ueID, pduSessionID)
+	//add
+	ctx := c.Request.Context()
+	s.Processor().DeregistrationSmfRegistrationsProcedure(ctx, c, ueID, pduSessionID)
 }
 
 // RegistrationSmfRegistrations - register as SMF
@@ -484,7 +496,10 @@ func (s *Server) HandleRegistrationSmfRegistrations(c *gin.Context) {
 	ueID := c.Params.ByName("ueId")
 	pduSessionID := c.Params.ByName("pduSessionId")
 
+	//add
+	ctx := c.Request.Context()
 	s.Processor().RegistrationSmfRegistrationsProcedure(
+		ctx,
 		c,
 		&smfRegistration,
 		ueID,
@@ -499,7 +514,9 @@ func (s *Server) HandleGetAmf3gppAccess(c *gin.Context) {
 	ueID := c.Param("ueId")
 	supportedFeatures := c.Query("supported-features")
 
-	s.Processor().GetAmf3gppAccessProcedure(c, ueID, supportedFeatures)
+	//add
+	ctx := c.Request.Context()
+	s.Processor().GetAmf3gppAccessProcedure(ctx, c, ueID, supportedFeatures)
 }
 
 func (s *Server) HandleDeregAMF(c *gin.Context) {

@@ -21,6 +21,12 @@ import (
 	"github.com/free5gc/udm/pkg/suci"
 	"github.com/free5gc/util/metrics/sbi"
 	"github.com/free5gc/util/ueauth"
+
+	//add
+	"context"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -75,16 +81,34 @@ func (p *Processor) strictHex(ss string, n int) string {
 	}
 }
 
-func (p *Processor) ConfirmAuthDataProcedure(c *gin.Context,
+func (p *Processor) ConfirmAuthDataProcedure(
+	baseCtx context.Context, //add
+	c *gin.Context,
 	authEvent models.AuthEvent,
 	supi string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UEAU ConfirmAuthDataProcedure")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+		attribute.String("serving_network", authEvent.ServingNetworkName),
+		attribute.String("auth.type", string(authEvent.AuthType)),
+		attribute.Bool("auth.success", authEvent.Success),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	var createAuthStatusRequest Nudr_DataRepository.CreateAuthenticationStatusRequest
 	createAuthStatusRequest.AuthEvent = &authEvent
 	createAuthStatusRequest.UeId = &supi
@@ -98,7 +122,7 @@ func (p *Processor) ConfirmAuthDataProcedure(c *gin.Context,
 	}
 
 	_, err = client.AuthenticationStatusDocumentApi.CreateAuthenticationStatus(
-		ctx, &createAuthStatusRequest)
+		ctxForHTTP, &createAuthStatusRequest) //add
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -118,16 +142,30 @@ func (p *Processor) ConfirmAuthDataProcedure(c *gin.Context,
 }
 
 func (p *Processor) GenerateAuthDataProcedure(
+	baseCtx context.Context, //add
 	c *gin.Context,
 	authInfoRequest models.AuthenticationInfoRequest,
 	supiOrSuci string,
 ) {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM UEAU GenerateAuthDataProcedure")
+	span.SetAttributes(
+		attribute.String("ue.id", supiOrSuci), // 還沒轉成 SUPI 前先記下 id
+		attribute.String("serving_network", authInfoRequest.ServingNetworkName),
+	)
+	defer span.End()
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 		return
 	}
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+
 	logger.UeauLog.Traceln("In GenerateAuthDataProcedure")
 
 	response := &models.UdmUeauAuthenticationInfoResult{}
@@ -158,7 +196,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 	var queryAuthSubsDataRequest Nudr_DataRepository.QueryAuthSubsDataRequest
 	queryAuthSubsDataRequest.UeId = &supi
 
-	authSubs, err := client.AuthenticationDataDocumentApi.QueryAuthSubsData(ctx, &queryAuthSubsDataRequest)
+	authSubs, err := client.AuthenticationDataDocumentApi.QueryAuthSubsData(ctxForHTTP, &queryAuthSubsDataRequest) //add
 	if err != nil {
 		logger.ProcLog.Errorf("Error on QueryAuthSubsData: %+v", err)
 		apiError, ok := err.(openapi.GenericOpenAPIError)
@@ -412,7 +450,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 	modifyAuthenticationSubscriptionRequest.UeId = &supi
 	modifyAuthenticationSubscriptionRequest.PatchItem = patchItemArray
 	_, err = client.AuthenticationSubscriptionDocumentApi.ModifyAuthenticationSubscription(
-		ctx, &modifyAuthenticationSubscriptionRequest)
+		ctxForHTTP, &modifyAuthenticationSubscriptionRequest) //add
 	if err != nil {
 		problemDetails := &models.ProblemDetails{
 			Status: http.StatusForbidden,

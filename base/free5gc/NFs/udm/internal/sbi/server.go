@@ -22,6 +22,9 @@ import (
 	"github.com/free5gc/util/httpwrapper"
 	logger_util "github.com/free5gc/util/logger"
 	"github.com/free5gc/util/metrics"
+
+	//add
+	otelgin "go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 type ServerUdm interface {
@@ -140,7 +143,14 @@ func (s *Server) shutdownHttpServer() {
 
 func newRouter(s *Server) *gin.Engine {
 	router := logger_util.NewGinWithLogrus(logger.GinLog)
-	router.Use(metrics.InboundMetrics())
+	//router.Use(metrics.InboundMetrics())
+
+	//add
+	// router.Use(metrics.InboundMetrics())
+	router.Use(
+		otelgin.Middleware("udm-sbi-server"),
+		metrics.InboundMetrics(),
+	)
 
 	// EE
 	udmEERoutes := s.getEventExposureRoutes()

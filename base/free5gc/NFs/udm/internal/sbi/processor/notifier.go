@@ -9,6 +9,12 @@ import (
 	"github.com/free5gc/openapi/udm/UEContextManagement"
 	"github.com/free5gc/udm/internal/logger"
 	"github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"context"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func (p *Processor) DataChangeNotificationProcedure(c *gin.Context,
@@ -52,20 +58,35 @@ func (p *Processor) DataChangeNotificationProcedure(c *gin.Context,
 	c.JSON(int(problemDetails.Status), problemDetails)
 }
 
-func (p *Processor) SendOnDeregistrationNotification(ueId string, onDeregistrationNotificationUrl string,
+func (p *Processor) SendOnDeregistrationNotification(
+	baseCtx context.Context,
+	ueId string, onDeregistrationNotificationUrl string,
 	deregistData models.UdmUecmDeregistrationData,
 ) *models.ProblemDetails {
+	//add
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	_, span := tracer.Start(baseCtx, "UDM SendOnDeregistrationNotification")
+	span.SetAttributes(
+		attribute.String("ue.id", ueId),
+		attribute.String("onDeregistrationNotificationUrl", onDeregistrationNotificationUrl),
+	)
+	defer span.End()
+
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDM_UECM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		return pd
 	}
 
+	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	clientAPI := p.Consumer().GetUECMClient("SendOnDeregistrationNotification")
 	var call3GppRegistrationDeregistrationNotificationPostRequest UEContextManagement.
 		Call3GppRegistrationDeregistrationNotificationPostRequest
 	call3GppRegistrationDeregistrationNotificationPostRequest.UdmUecmDeregistrationData = &deregistData
 	_, err = clientAPI.AMFRegistrationFor3GPPAccessApi.
-		Call3GppRegistrationDeregistrationNotificationPost(ctx,
+		Call3GppRegistrationDeregistrationNotificationPost(ctxForHTTP, //add
 			onDeregistrationNotificationUrl,
 			&call3GppRegistrationDeregistrationNotificationPostRequest)
 	if err != nil {

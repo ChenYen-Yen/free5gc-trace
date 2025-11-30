@@ -21,6 +21,17 @@ import (
 	"github.com/free5gc/udm/pkg/factory"
 	"github.com/free5gc/util/metrics"
 	"github.com/free5gc/util/metrics/utils"
+
+	//add
+	"go.opentelemetry.io/otel"
+	//"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	//"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	//"google.golang.org/grpc
 )
 
 var _ app.App = &UdmApp{}
@@ -141,6 +152,20 @@ func (a *UdmApp) SetReportCaller(reportCaller bool) {
 }
 
 func (a *UdmApp) Start() {
+	//add
+	ctx := a.ctx
+
+	tp, err := initTracerProvider(ctx, "udm")
+	if err != nil {
+		logger.AppLog.Warnf("Failed to init tracer provider: %+v", err)
+		// tracing 掛了不影響 AUSF 本身啟動，這裡你可以選擇 return 或是繼續跑
+		// return
+	}
+	if tp != nil {
+		defer func() {
+			_ = tp.Shutdown(ctx)
+		}()
+	}
 	logger.InitLog.Infoln("Server started")
 
 	a.wg.Add(1)
@@ -235,4 +260,49 @@ func (a *UdmApp) Consumer() *consumer.Consumer {
 
 func (a *UdmApp) Processor() *processor.Processor {
 	return a.processor
+}
+
+func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.TracerProvider, error) {
+	// 1. 建立 console trace exporter（輸出到 stdout）
+	exporter, err := stdouttrace.New(
+		stdouttrace.WithPrettyPrint(),     // 輸出成比較好讀的 JSON
+		stdouttrace.WithWriter(os.Stdout), // 預設就是 Stdout，其實可省略
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. 設定 Resource（service.name 很重要）
+	res, err := resource.New(
+		ctx,
+		resource.WithFromEnv(),
+		resource.WithProcess(),
+		resource.WithTelemetrySDK(),
+		resource.WithHost(),
+		resource.WithAttributes(
+			semconv.ServiceName(serviceName),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. 建立 TracerProvider
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+
+	// 4. 設為 global
+	otel.SetTracerProvider(tp)
+	// 如有需要，這裡也可以設定 Propagator（例如 W3C TraceContext）
+	// otel.SetTextMapPropagator(propagation.TraceContext{})
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		),
+	)
+
+	return tp, nil
 }
