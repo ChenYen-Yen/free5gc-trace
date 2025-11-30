@@ -189,11 +189,9 @@ func (a *NssfApp) Start() {
 	//add
 	ctx := a.ctx
 
-	tp, tpErr := initTracerProvider(ctx, "ausf")
+	tp, tpErr := initTracerProvider(ctx, "nssf")
 	if tpErr != nil {
 		logger.AppLog.Warnf("Failed to init tracer provider: %+v", tpErr)
-		// tracing 掛了不影響 AUSF 本身啟動，這裡你可以選擇 return 或是繼續跑
-		// return
 	}
 	if tp != nil {
 		defer func() {
