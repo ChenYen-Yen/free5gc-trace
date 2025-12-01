@@ -74,7 +74,14 @@ services:
       - ./config/amfcfg.yaml:/free5gc/config/amfcfg.yaml
       - ./cert:/free5gc/cert
     environment:
-      GIN_MODE: release
+      - GIN_MODE=release
+      # 暫時完全不要送去 OTLP collector
+      - OTEL_TRACES_EXPORTER=none
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_INSECURE=true
     logging:
       driver: loki
       options:
@@ -86,6 +93,11 @@ services:
           - amf.free5gc.org
     depends_on:
       - free5gc-nrf
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   free5gc-ausf:
     container_name: ausf
@@ -100,7 +112,14 @@ services:
       - ./config/ausfcfg.yaml:/free5gc/config/ausfcfg.yaml
       - ./cert:/free5gc/cert
     environment:
-      GIN_MODE: release
+      - GIN_MODE=release
+      # 暫時完全不要送去 OTLP collector
+      - OTEL_TRACES_EXPORTER=none
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_INSECURE=true
     logging:
       driver: loki
       options:
@@ -111,6 +130,11 @@ services:
           - ausf.free5gc.org
     depends_on:
       - free5gc-nrf
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   free5gc-nssf:
     container_name: nssf
@@ -125,7 +149,14 @@ services:
       - ./config/nssfcfg.yaml:/free5gc/config/nssfcfg.yaml
       - ./cert:/free5gc/cert
     environment:
-      GIN_MODE: release
+      - GIN_MODE=release
+      # 暫時完全不要送去 OTLP collector
+      - OTEL_TRACES_EXPORTER=none
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_INSECURE=true
     logging:
       driver: loki
       options:
@@ -136,6 +167,11 @@ services:
           - nssf.free5gc.org
     depends_on:
       - free5gc-nrf
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   free5gc-pcf:
     container_name: pcf
@@ -202,7 +238,14 @@ services:
       - ./config/udmcfg.yaml:/free5gc/config/udmcfg.yaml
       - ./cert:/free5gc/cert
     environment:
-      GIN_MODE: release
+      - GIN_MODE=release
+      # 暫時完全不要送去 OTLP collector
+      - OTEL_TRACES_EXPORTER=none
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_INSECURE=true
     logging:
       driver: loki
       options:
@@ -214,6 +257,11 @@ services:
     depends_on:
       - db
       - free5gc-nrf
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   free5gc-udr:
     container_name: udr
