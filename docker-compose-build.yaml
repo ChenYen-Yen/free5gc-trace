@@ -257,8 +257,15 @@ services:
       - ./config/udrcfg.yaml:/free5gc/config/udrcfg.yaml
       - ./cert:/free5gc/cert
     environment:
-      DB_URI: mongodb://db/free5gc
-      GIN_MODE: release
+      - DB_URI=mongodb://db/free5gc
+      - GIN_MODE=release
+      # 暫時完全不要送去 OTLP collector
+      - OTEL_TRACES_EXPORTER=none
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_INSECURE=true
     networks:
       privnet:
         aliases:
@@ -266,6 +273,11 @@ services:
     depends_on:
       - db
       - free5gc-nrf
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   free5gc-chf:
     container_name: chf
