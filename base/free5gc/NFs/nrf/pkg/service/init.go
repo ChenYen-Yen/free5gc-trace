@@ -21,6 +21,14 @@ import (
 	"github.com/free5gc/util/metrics"
 	"github.com/free5gc/util/metrics/utils"
 	"github.com/free5gc/util/mongoapi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
 var NRF *NrfApp
@@ -173,6 +181,20 @@ func (a *NrfApp) Start() {
 		return
 	}
 
+	//add
+	ctx := a.ctx
+
+	tp, err := initTracerProvider(ctx, "nrf")
+	if err != nil {
+		logger.AppLog.Warnf("Failed to init tracer provider: %+v", err)
+		// tracing 掛掉先不影響 NRF 本身啟動
+	}
+	if tp != nil {
+		defer func() {
+			_ = tp.Shutdown(ctx)
+		}()
+	}
+
 	logger.InitLog.Infoln("Server starting")
 
 	a.wg.Add(1)
@@ -250,4 +272,48 @@ func (a *NrfApp) waitNfDeregister(waitTime int) {
 func (a *NrfApp) WaitRoutineStopped() {
 	a.wg.Wait()
 	logger.InitLog.Infof("NRF App terminated")
+}
+
+// add
+func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.TracerProvider, error) {
+	// 1. 建立 console trace exporter（先輸出到 stdout）
+	exporter, err := stdouttrace.New(
+		stdouttrace.WithPrettyPrint(),
+		stdouttrace.WithWriter(os.Stdout),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. 設定 Resource（service.name 很重要）
+	res, err := resource.New(
+		ctx,
+		resource.WithFromEnv(),
+		resource.WithProcess(),
+		resource.WithTelemetrySDK(),
+		resource.WithHost(),
+		resource.WithAttributes(
+			semconv.ServiceName(serviceName),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. 建立 TracerProvider
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+
+	// 4. 設為 global
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		),
+	)
+
+	return tp, nil
 }

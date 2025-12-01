@@ -20,9 +20,22 @@ import (
 	"github.com/free5gc/openapi/oauth"
 	timedecode "github.com/free5gc/util/mapstruct"
 	"github.com/free5gc/util/mongoapi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (p *Processor) HandleNFDeregisterRequest(c *gin.Context, nfInstanceId string) {
+	//add
+	ctx := c.Request.Context()
+	tracer := otel.Tracer("nrf-processor")
+	ctx, span := tracer.Start(ctx, "NRF NFDeregister")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
+	span.SetAttributes(attribute.String("nf.instance_id", nfInstanceId))
+
 	logger.NfmLog.Infoln("Handle NFDeregisterRequest")
 
 	problemDetails := p.NFDeregisterProcedure(nfInstanceId)
@@ -395,6 +408,14 @@ func (p *Processor) NFRegisterProcedure(
 	logger.NfmLog.Traceln("[NRF] In NFRegisterProcedure")
 	var nf models.NrfNfManagementNfProfile
 
+	//add
+	ctx := c.Request.Context()
+	tracer := otel.Tracer("nrf-processor")
+	ctx, span := tracer.Start(ctx, "NRF NFRegister")
+	defer span.End()
+
+	c.Request = c.Request.WithContext(ctx)
+
 	err := nrf_context.NnrfNFManagementDataModel(&nf, nfProfile)
 	if err != nil {
 		problemDetails := &models.ProblemDetails{
@@ -438,6 +459,12 @@ func (p *Processor) NFRegisterProcedure(
 	collName := nrf_context.NfProfileCollName
 	nfInstanceId := nf.NfInstanceId
 	filter := bson.M{"nfInstanceId": nfInstanceId}
+
+	span.SetAttributes(
+		attribute.String("nf.type", string(nf.NfType)),
+		attribute.String("nf.coll_name", collName),
+		attribute.String("nf.instance_id", nfInstanceId),
+	)
 
 	// Update NF Profile case
 	existed, err := mongoapi.RestfulAPIPutOne(collName, filter, putData)
