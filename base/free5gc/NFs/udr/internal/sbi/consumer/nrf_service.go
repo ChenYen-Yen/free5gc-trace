@@ -13,6 +13,10 @@ import (
 	udr_context "github.com/free5gc/udr/internal/context"
 	"github.com/free5gc/udr/internal/logger"
 	sbi_metrics "github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type NrfService struct {
@@ -35,6 +39,7 @@ func (ns *NrfService) getNFManagementClient(uri string) *NFManagement.APIClient 
 	configuration := NFManagement.NewConfiguration()
 	configuration.SetBasePath(uri)
 	configuration.SetMetrics(sbi_metrics.SbiMetricHook)
+	configuration.SetHTTPClient(newOtelHTTPClient()) //add
 	client = NFManagement.NewAPIClient(configuration)
 
 	ns.nfMngmntMu.RUnlock()
@@ -76,9 +81,21 @@ func (ns *NrfService) buildNFProfile(context *udr_context.UDRContext) (models.Nr
 func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nrfUri string) (
 	resourceNrfUri string, retrieveNfInstanceId string, err error,
 ) {
+	udrCtx := udr_context.GetSelf()
+
+	// 開一個 outbound span：UDR → NRF: RegisterNFInstance
+	tracer := otel.Tracer("udr-sbi")
+	ctx, span := tracer.Start(ctx, "UDR → NRF: RegisterNFInstance")
+	span.SetAttributes(
+		attribute.String("nf.instance_id", udrCtx.NfId),
+		attribute.String("nrf.uri", nrfUri),
+	)
+	defer span.End()
+
 	// Set client and set url
-	profile, err := ns.buildNFProfile(udr_context.GetSelf())
+	profile, err := ns.buildNFProfile(udrCtx)
 	if err != nil {
+		span.SetAttributes(attribute.String("error.build_profile", err.Error()))
 		return "", "", fmt.Errorf("failed to build nrf profile %s", err.Error())
 	}
 
@@ -109,6 +126,12 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nrfUri string)
 			resourceUri := rsp.Location
 			resourceNrfUri, _, _ = strings.Cut(resourceUri, "/nnrf-nfm/")
 			retrieveNfInstanceId = resourceUri[strings.LastIndex(resourceUri, "/")+1:]
+
+			//add
+			span.SetAttributes(
+				attribute.String("nrf.resource_uri", resourceUri),
+				attribute.String("nrf.assigned_instance_id", retrieveNfInstanceId),
+			)
 
 			oauth2 := false
 
