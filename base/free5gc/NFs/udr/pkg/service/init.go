@@ -26,7 +26,8 @@ import (
 
 	//add
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -280,12 +281,19 @@ func (a *UdrApp) WaitRoutineStopped() {
 	logger.MainLog.Infof("UDR terminated")
 }
 
-// add
 func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.TracerProvider, error) {
-	exporter, err := stdouttrace.New(
-		stdouttrace.WithPrettyPrint(),
-		stdouttrace.WithWriter(os.Stdout),
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		return nil, fmt.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT not set")
+	}
+
+	// HTTP OTLP client，endpoint 例如 "tempo:4318"
+	client := otlptracehttp.NewClient(
+		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithInsecure(),
 	)
+
+	exporter, err := otlptrace.New(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +301,6 @@ func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.Trac
 	res, err := resource.New(
 		ctx,
 		resource.WithFromEnv(),
-		resource.WithProcess(),
 		resource.WithTelemetrySDK(),
 		resource.WithHost(),
 		resource.WithAttributes(

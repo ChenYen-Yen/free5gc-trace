@@ -32,7 +32,7 @@ func (p *Processor) GetAmDataProcedure(baseCtx context.Context, c *gin.Context, 
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM GetAmDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetAmDataProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("plmn", plmnID),
@@ -93,7 +93,7 @@ func (p *Processor) GetIdTranslationResultProcedure(baseCtx context.Context, c *
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM GetIdTranslationResultProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetIdTranslationResultProcedure")
 	span.SetAttributes(
 		attribute.String("gpsi", gpsi),
 	)
@@ -163,7 +163,7 @@ func (p *Processor) GetSupiProcedure(
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM GetSupiProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetSupiProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("plmn", plmnID),
@@ -397,7 +397,7 @@ func (p *Processor) GetSharedDataProcedure(baseCtx context.Context, c *gin.Conte
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM GetSharedDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetSharedDataProcedure")
 	span.SetAttributes(
 		attribute.String("supported_features", supportedFeatures),
 	)
@@ -458,7 +458,7 @@ func (p *Processor) GetSmDataProcedure(
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM GetSmDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetSmDataProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("plmn", plmnID),
@@ -562,7 +562,7 @@ func (p *Processor) GetNssaiProcedure(baseCtx context.Context, c *gin.Context, s
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM GetNssaiProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetNssaiProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("plmn", plmnID),
@@ -623,7 +623,7 @@ func (p *Processor) GetSmfSelectDataProcedure(baseCtx context.Context, c *gin.Co
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM GetSmfSelectDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetSmfSelectDataProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("plmn", plmnID),
@@ -706,7 +706,7 @@ func (p *Processor) SubscribeToSharedDataProcedure(baseCtx context.Context, c *g
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM SubscribeToSharedDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDM: SubscribeToSharedDataProcedure")
 	defer span.End()
 
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDM_SDM, models.NrfNfManagementNfType_UDM)
@@ -752,7 +752,7 @@ func (p *Processor) SubscribeProcedure(baseCtx context.Context, c *gin.Context, 
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM SubscribeProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: SubscribeProcedure")
 	defer span.End()
 	ctx, pd, err := p.Context().GetTokenCtx(models.ServiceName_NUDR_DR, models.NrfNfManagementNfType_UDR)
 	if err != nil {
@@ -803,7 +803,7 @@ func (p *Processor) UnsubscribeForSharedDataProcedure(baseCtx context.Context, c
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UnsubscribeForSharedDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDM: UnsubscribeForSharedDataProcedure")
 	span.SetAttributes(
 		attribute.String("subscriptionID", subscriptionID),
 	)
@@ -846,7 +846,7 @@ func (p *Processor) UnsubscribeProcedure(baseCtx context.Context, c *gin.Context
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UnsubscribeProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: UnsubscribeProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("subscriptionID", subscriptionID),
@@ -902,7 +902,7 @@ func (p *Processor) ModifyProcedure(
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM ModifyProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: ModifyProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("subscriptionID", subscriptionID),
@@ -965,7 +965,7 @@ func (p *Processor) ModifyForSharedDataProcedure(
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM ModifyForSharedDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: ModifyForSharedDataProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("subscriptionID", subscriptionID),
@@ -1022,7 +1022,7 @@ func (p *Processor) GetTraceDataProcedure(baseCtx context.Context, c *gin.Contex
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM GetTraceDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetTraceDataProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("plmn", plmnID),
@@ -1100,7 +1100,7 @@ func (p *Processor) GetUeContextInSmfDataProcedure(baseCtx context.Context, c *g
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM GetUeContextInSmfDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetUeContextInSmfDataProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("supported_features", supportedFeatures),
