@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/hex"
 	"io"
 	"net"
@@ -12,12 +13,14 @@ import (
 	"github.com/free5gc/amf/pkg/factory"
 	"github.com/free5gc/ngap"
 	"github.com/free5gc/sctp"
+	"go.opentelemetry.io/otel"
 )
 
 type NGAPHandler struct {
-	HandleMessage         func(conn net.Conn, msg []byte)
-	HandleNotification    func(conn net.Conn, notification sctp.Notification)
-	HandleConnectionError func(conn net.Conn)
+	HandleMessage            func(conn net.Conn, msg []byte)
+	HandleMessageWithContext func(ctx context.Context, conn net.Conn, msg []byte)
+	HandleNotification       func(conn net.Conn, notification sctp.Notification)
+	HandleConnectionError    func(conn net.Conn)
 }
 
 const (
@@ -180,15 +183,21 @@ func Stop() {
 }
 
 func handleConnection(conn *sctp.SCTPConn, bufsize uint32, handler NGAPHandler) {
+	tracer := otel.Tracer("amf")
+	ctx, span := tracer.Start(context.Background(), "ngap.connection")
+	defer span.End()
+
 	defer func() {
 		if p := recover(); p != nil {
 			// Print stack for panic to log. Fatalf() will let program exit.
-			logger.NgapLog.Fatalf("panic: %v\n%s", p, string(debug.Stack()))
+			log := logger.WithTraceContext(ctx, logger.NgapLog)
+			log.Fatalf("panic: %v\n%s", p, string(debug.Stack()))
 		}
 
 		// if AMF call Stop(), then conn.Close() will return EBADF because conn has been closed inside Stop()
 		if err := conn.Close(); err != nil && err != syscall.EBADF {
-			logger.NgapLog.Errorf("close connection error: %+v", err)
+			log := logger.WithTraceContext(ctx, logger.NgapLog)
+			log.Errorf("close connection error: %+v", err)
 		}
 		connections.Delete(conn)
 	}()
@@ -236,7 +245,15 @@ func handleConnection(conn *sctp.SCTPConn, bufsize uint32, handler NGAPHandler) 
 			logger.NgapLog.Tracef("Packet content:\n%+v", hex.Dump(buf[:n]))
 
 			// TODO: concurrent on per-UE message
-			handler.HandleMessage(conn, buf[:n])
+			if handler.HandleMessageWithContext != nil {
+				// Create a per-message child span so each NGAP message has its own trace context
+				// This allows ran.Log to include the specific message's trace_id/span_id
+				msgCtx, msgSpan := tracer.Start(ctx, "ngap.message")
+				handler.HandleMessageWithContext(msgCtx, conn, buf[:n])
+				msgSpan.End()
+			} else {
+				handler.HandleMessage(conn, buf[:n])
+			}
 		}
 	}
 }

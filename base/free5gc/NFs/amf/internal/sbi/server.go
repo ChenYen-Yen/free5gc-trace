@@ -12,6 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
+	otelgin "go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+
 	amf_context "github.com/free5gc/amf/internal/context"
 	"github.com/free5gc/amf/internal/logger"
 	"github.com/free5gc/amf/internal/sbi/consumer"
@@ -66,7 +68,14 @@ func NewServer(amf ServerAmf, tlsKeyLogPath string) (*Server, error) {
 }
 
 func newRouter(s *Server) *gin.Engine {
-	router := logger_util.NewGinWithLogrus(logger.GinLog)
+	router := logger_util.NewGinWithLogrus(logger.GinLog, otelgin.Middleware("amf"))
+
+	// add a small test endpoint always mounted so we can validate trace-aware logs
+	router.GET("/_trace_test", func(c *gin.Context) {
+		log := logger.WithTrace(c, logger.GinLog)
+		log.Info("_trace_test handler invoked")
+		c.String(200, "ok")
+	})
 
 	router.Use(metrics.InboundMetrics())
 	amfHttpCallBackGroup := router.Group(factory.AmfCallbackResUriPrefix)

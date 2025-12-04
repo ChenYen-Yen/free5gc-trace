@@ -14,6 +14,8 @@ import (
 )
 
 func Index(c *gin.Context) {
+	log := logger.WithTrace(c, logger.GinLog)
+	log.Info("Index handler called")
 	c.String(http.StatusOK, "Hello World!")
 }
 
@@ -22,9 +24,7 @@ func (s *Server) getCommunicationRoutes() []Route {
 		{
 			Method:  http.MethodGet,
 			Pattern: "/",
-			APIFunc: func(c *gin.Context) {
-				c.String(http.StatusOK, "Hello World!")
-			},
+			APIFunc: Index,
 		},
 		{
 			Name:    "AMFStatusChangeSubscribeModfy",

@@ -70,6 +70,10 @@ services:
         ipv4_address: 10.100.200.16
         aliases:
           - amf.free5gc.org
+    logging:
+      driver: loki
+      options:
+        loki-url: http://10.100.200.52:3100/loki/api/v1/push
     depends_on:
       - free5gc-nrf
 

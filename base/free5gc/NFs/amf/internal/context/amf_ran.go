@@ -1,6 +1,7 @@
 package context
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -35,6 +36,9 @@ type AmfRan struct {
 	/* RAN UE List */
 	RanUeList sync.Map // RanUeNgapId as key
 
+	/* context for trace propagation */
+	Ctx context.Context
+
 	/* logger */
 	Log *logrus.Entry
 }
@@ -56,6 +60,10 @@ func (ran *AmfRan) Remove() {
 }
 
 func (ran *AmfRan) NewRanUe(ranUeNgapID int64) (*RanUe, error) {
+	return ran.NewRanUeWithContext(context.Background(), ranUeNgapID)
+}
+
+func (ran *AmfRan) NewRanUeWithContext(ctx context.Context, ranUeNgapID int64) (*RanUe, error) {
 	ranUe := RanUe{}
 	self := GetSelf()
 	amfUeNgapID, err := self.AllocateAmfUeNgapID()
@@ -65,7 +73,9 @@ func (ran *AmfRan) NewRanUe(ranUeNgapID int64) (*RanUe, error) {
 	ranUe.AmfUeNgapId = amfUeNgapID
 	ranUe.RanUeNgapId = ranUeNgapID
 	ranUe.Ran = ran
-	ranUe.Log = ran.Log
+	ranUe.TraceContext = ctx
+	// Bind trace context to ranUe.Log so all ranUe.Log calls include trace_id/span_id
+	ranUe.Log = logger.WithTraceContext(ctx, ran.Log)
 	ranUe.HoldingAmfUe = nil
 	ranUe.UpdateLogFields()
 

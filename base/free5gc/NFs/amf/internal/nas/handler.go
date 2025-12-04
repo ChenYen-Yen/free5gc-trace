@@ -94,6 +94,10 @@ func HandleNAS(ranUe *amf_context.RanUe, procedureCode int64, nasPdu []byte, ini
 	ranUe.AmfUe.TraceContext = ctx
 	ranUe.TraceContext = ctx
 
+	// Bind GMM logger with trace context
+	ranUe.AmfUe.GmmLog = logger.WithTraceContext(ctx, ranUe.AmfUe.GmmLog)
+	ranUe.AmfUe.NASLog = logger.WithTraceContext(ctx, ranUe.AmfUe.NASLog)
+
 	// UE 層級資訊
 	if ranUe.AmfUe != nil {
 		span.SetAttributes(

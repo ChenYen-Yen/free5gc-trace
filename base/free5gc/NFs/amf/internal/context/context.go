@@ -2,6 +2,7 @@ package context
 
 import (
 	"context"
+	stdctx "context"
 	"fmt"
 	"math"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/free5gc/amf/internal/logger"
 	"github.com/free5gc/amf/pkg/factory"
@@ -367,15 +369,24 @@ func (context *AMFContext) AmfUeFindByPei(pei string) (*AmfUe, bool) {
 }
 
 func (context *AMFContext) NewAmfRan(conn net.Conn) *AmfRan {
+	return context.NewAmfRanWithContext(stdctx.Background(), conn)
+}
+
+func (context *AMFContext) NewAmfRanWithContext(ctx context.Context, conn net.Conn) *AmfRan {
 	ran := AmfRan{}
 	ran.SupportedTAList = make([]SupportedTAI, 0, MaxNumOfTAI*MaxNumOfBroadcastPLMNs)
 	ran.Conn = conn
+	ran.Ctx = ctx // bind context for trace propagation
+
 	addr := conn.RemoteAddr()
+	var baseLog *logrus.Entry
 	if addr != nil {
-		ran.Log = logger.NgapLog.WithField(logger.FieldRanAddr, addr.String())
+		baseLog = logger.NgapLog.WithField(logger.FieldRanAddr, addr.String())
 	} else {
-		ran.Log = logger.NgapLog.WithField(logger.FieldRanAddr, "(nil)")
+		baseLog = logger.NgapLog.WithField(logger.FieldRanAddr, "(nil)")
 	}
+	// bind trace context to ran.Log so all subsequent logs automatically include trace_id/span_id
+	ran.Log = logger.WithTraceContext(ctx, baseLog)
 
 	context.AmfRanPool.Store(conn, &ran)
 	return &ran
@@ -562,10 +573,10 @@ func GetSelf() *AMFContext {
 }
 
 func (c *AMFContext) GetTokenCtx(serviceName models.ServiceName, targetNF models.NrfNfManagementNfType) (
-	context.Context, *models.ProblemDetails, error,
+	stdctx.Context, *models.ProblemDetails, error,
 ) {
 	if !c.OAuth2Required {
-		return context.TODO(), nil, nil
+		return stdctx.TODO(), nil, nil
 	}
 	return oauth.GetTokenCtx(models.NrfNfManagementNfType_AMF, targetNF,
 		c.NfId, c.NrfUri, string(serviceName))

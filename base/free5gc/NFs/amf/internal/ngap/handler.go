@@ -466,7 +466,9 @@ func handleInitialUEMessageMain(ran *context.AmfRan,
 	}
 
 	var err error
-	ranUe, err = ran.NewRanUe(rANUENGAPID.Value)
+	// Pass ran.Ctx (containing per-message span) to NewRanUe
+	// so trace context propagates to NAS handlers and HTTP client calls
+	ranUe, err = ran.NewRanUeWithContext(ran.Ctx, rANUENGAPID.Value)
 	if err != nil {
 		ran.Log.Errorf("NewRanUe Error: %+v", err)
 	}
