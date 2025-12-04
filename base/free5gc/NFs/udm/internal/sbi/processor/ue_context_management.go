@@ -27,7 +27,7 @@ func (p *Processor) GetAmf3gppAccessProcedure(baseCtx context.Context, c *gin.Co
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UECM GetAmf3gppAccessProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetAmf3gppAccessProcedure")
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
 		attribute.String("ue.id", ueID),
@@ -81,7 +81,7 @@ func (p *Processor) GetAmfNon3gppAccessProcedure(baseCtx context.Context, c *gin
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UECM GetAmfNon3gppAccessProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GetAmfNon3gppAccessProcedure")
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
 		attribute.String("ue.id", ueID),
@@ -129,7 +129,7 @@ func (p *Processor) RegistrationAmf3gppAccessProcedure(baseCtx context.Context, 
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UECM RegistrationAmf3gppAccessProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR/AMF: RegistrationAmf3gppAccessProcedure")
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
 		attribute.String("ue.id", ueID),
@@ -198,6 +198,9 @@ func (p *Processor) RegistrationAmf3gppAccessProcedure(baseCtx context.Context, 
 
 			go func() {
 				logger.UecmLog.Infof("Send DeregNotify to old AMF GUAMI=%v", oldAmf3GppAccessRegContext.Guami)
+				span.SetAttributes(
+					attribute.Bool("to_AMF", true),
+				)
 				pd := p.SendOnDeregistrationNotification(ctxForHTTP, ueID, //add
 					oldAmf3GppAccessRegContext.DeregCallbackUri,
 					deregistData) // Deregistration Notify Triggered
@@ -224,7 +227,7 @@ func (p *Processor) RegisterAmfNon3gppAccessProcedure(baseCtx context.Context, c
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UECM RegisterAmfNon3gppAccessProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR/AMF: RegisterAmfNon3gppAccessProcedure")
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
 		attribute.String("ue.id", ueID),
@@ -282,6 +285,9 @@ func (p *Processor) RegisterAmfNon3gppAccessProcedure(baseCtx context.Context, c
 
 		go func() {
 			logger.UecmLog.Infof("Send DeregNotify to old AMF GUAMI=%v", oldAmfNon3GppAccessRegContext.Guami)
+			span.SetAttributes(
+				attribute.Bool("to_AMF", true),
+			)
 			pd := p.SendOnDeregistrationNotification(ctxForHTTP, ueID, oldAmfNon3GppAccessRegContext.DeregCallbackUri, //add
 				deregistData) // Deregistration Notify Triggered
 			if pd != nil {
@@ -308,7 +314,7 @@ func (p *Processor) UpdateAmf3gppAccessProcedure(
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UECM UpdateAmf3gppAccessProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: UpdateAmf3gppAccessProcedure")
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
 		attribute.String("ue.id", ueID),
@@ -437,7 +443,7 @@ func (p *Processor) UpdateAmfNon3gppAccessProcedure(
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UECM UpdateAmfNon3gppAccessProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: UpdateAmfNon3gppAccessProcedure")
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
 		attribute.String("ue.id", ueID),
@@ -561,7 +567,7 @@ func (p *Processor) DeregistrationSmfRegistrationsProcedure(
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UECM DeregistrationSmfRegistrationsProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: DeregistrationSmfRegistrationsProcedure")
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
 		attribute.String("ue.id", ueID),
@@ -626,7 +632,7 @@ func (p *Processor) RegistrationSmfRegistrationsProcedure(
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UECM RegistrationSmfRegistrationsProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: RegistrationSmfRegistrationsProcedure")
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
 		attribute.String("ue.id", ueID),

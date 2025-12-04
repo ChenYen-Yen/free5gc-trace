@@ -81,7 +81,7 @@ func (s *nnrfService) getNFDiscClient(uri string) *Nnrf_NFDiscovery.APIClient {
 	return client
 }
 
-func (s *nnrfService) SendSearchNFInstances(nrfUri string, targetNfType, requestNfType models.NrfNfManagementNfType,
+func (s *nnrfService) SendSearchNFInstances(baseCtx context.Context, nrfUri string, targetNfType, requestNfType models.NrfNfManagementNfType,
 	param *Nnrf_NFDiscovery.SearchNFInstancesRequest,
 ) (*models.SearchResult, error) {
 	// Set client and set url
@@ -93,7 +93,9 @@ func (s *nnrfService) SendSearchNFInstances(nrfUri string, targetNfType, request
 	}
 
 	//add
-	baseCtx := context.Background()
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
 
 	ctx, _, err := amf_context.GetSelf().GetTokenCtx(models.ServiceName_NNRF_DISC, models.NrfNfManagementNfType_NRF)
 	if err != nil {
@@ -127,7 +129,7 @@ func (s *nnrfService) SearchUdmSdmInstance(
 	ue *amf_context.AmfUe, nrfUri string, targetNfType, requestNfType models.NrfNfManagementNfType,
 	param *Nnrf_NFDiscovery.SearchNFInstancesRequest,
 ) error {
-	resp, localErr := s.SendSearchNFInstances(nrfUri, targetNfType, requestNfType, param)
+	resp, localErr := s.SendSearchNFInstances(ue.TraceContext, nrfUri, targetNfType, requestNfType, param)
 	if localErr != nil {
 		return localErr
 	}
@@ -155,7 +157,7 @@ func (s *nnrfService) SearchNssfNSSelectionInstance(
 	ue *amf_context.AmfUe, nrfUri string, targetNfType, requestNfType models.NrfNfManagementNfType,
 	param *Nnrf_NFDiscovery.SearchNFInstancesRequest,
 ) error {
-	resp, localErr := s.SendSearchNFInstances(nrfUri, targetNfType, requestNfType, param)
+	resp, localErr := s.SendSearchNFInstances(ue.TraceContext, nrfUri, targetNfType, requestNfType, param)
 	if localErr != nil {
 		return localErr
 	}
@@ -180,7 +182,7 @@ func (s *nnrfService) SearchNssfNSSelectionInstance(
 func (s *nnrfService) SearchAmfCommunicationInstance(ue *amf_context.AmfUe, nrfUri string, targetNfType,
 	requestNfType models.NrfNfManagementNfType, param *Nnrf_NFDiscovery.SearchNFInstancesRequest,
 ) (err error) {
-	resp, localErr := s.SendSearchNFInstances(nrfUri, targetNfType, requestNfType, param)
+	resp, localErr := s.SendSearchNFInstances(ue.TraceContext, nrfUri, targetNfType, requestNfType, param)
 	if localErr != nil {
 		err = localErr
 		return

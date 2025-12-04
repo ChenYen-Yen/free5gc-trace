@@ -18,6 +18,10 @@ import (
 	"github.com/free5gc/openapi/models"
 	timedecode "github.com/free5gc/util/mapstruct"
 	"github.com/free5gc/util/mongoapi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (p *Processor) HandleNFDiscoveryRequest(c *gin.Context, queryParameters url.Values) {
@@ -73,6 +77,26 @@ func validateQueryParameters(queryParameters url.Values) bool {
 }
 
 func (p *Processor) NFDiscoveryProcedure(c *gin.Context, queryParameters url.Values) {
+	//add
+	ctx := c.Request.Context()
+	tracer := otel.Tracer("nrf-processor")
+	ctx, span := tracer.Start(ctx, "NRF NFDiscoveryProcedure")
+	defer span.End()
+
+	// 把新的 ctx 綁回 request，後續如果有用 Request.Context() 就會接到這個 span
+	c.Request = c.Request.WithContext(ctx)
+
+	// 補一些常用 attribute，之後在 Tempo 很好查
+	targetNfType := queryParameters.Get("target-nf-type")
+	requesterNfType := queryParameters.Get("requester-nf-type")
+	supi := queryParameters.Get("supi")
+
+	span.SetAttributes(
+		attribute.String("nf.target.type", targetNfType),
+		attribute.String("nf.requester.type", requesterNfType),
+		attribute.String("ue.supi", supi),
+	)
+
 	if !validateQueryParameters(queryParameters) {
 		problemDetails := &models.ProblemDetails{
 			Title:  "Invalid Parameter",

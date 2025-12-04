@@ -751,7 +751,7 @@ func HandleInitialRegistration(ue *context.AmfUe, anType models.AccessType) erro
 	// }
 	for {
 		resp, err := consumer.GetConsumer().SendSearchNFInstances(
-			amfSelf.NrfUri, models.NrfNfManagementNfType_PCF, models.NrfNfManagementNfType_AMF, &param)
+			ue.TraceContext, amfSelf.NrfUri, models.NrfNfManagementNfType_PCF, models.NrfNfManagementNfType_AMF, &param)
 		if err != nil {
 			ue.GmmLog.Error("AMF can not select an PCF by NRF")
 		} else {
@@ -1055,7 +1055,7 @@ func communicateWithUDM(ue *context.AmfUe, accessType models.AccessType) error {
 		Supi: &ue.Supi,
 	}
 	resp, err := consumer.GetConsumer().SendSearchNFInstances(
-		amfSelf.NrfUri, models.NrfNfManagementNfType_UDM, models.NrfNfManagementNfType_AMF, &param)
+		ue.TraceContext, amfSelf.NrfUri, models.NrfNfManagementNfType_UDM, models.NrfNfManagementNfType_AMF, &param)
 	if err != nil {
 		return errors.Errorf("AMF can not select an UDM by NRF: SendSearchNFInstances failed")
 	}
@@ -1715,7 +1715,7 @@ func AuthenticationProcedure(ue *context.AmfUe, accessType models.AccessType) (b
 	// TODO: consider ausf group id, Routing ID part of SUCI
 	param := Nnrf_NFDiscovery.SearchNFInstancesRequest{}
 	resp, err := consumer.GetConsumer().SendSearchNFInstances(
-		amfSelf.NrfUri, models.NrfNfManagementNfType_AUSF, models.NrfNfManagementNfType_AMF, &param)
+		ue.TraceContext, amfSelf.NrfUri, models.NrfNfManagementNfType_AUSF, models.NrfNfManagementNfType_AMF, &param)
 	if err != nil {
 		ue.GmmLog.Error("AMF can not select an AUSF by NRF")
 		gmm_message.SendRegistrationReject(ue.RanUe[accessType], nasMessage.Cause5GMMCongestion, "")

@@ -20,6 +20,9 @@ import (
 	"github.com/free5gc/util/httpwrapper"
 	logger_util "github.com/free5gc/util/logger"
 	"github.com/free5gc/util/metrics"
+
+	//add
+	otelgin "go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 type ServerNrf interface {
@@ -41,7 +44,12 @@ func NewServer(nrf ServerNrf, tlsKeyLogPath string) (*Server, error) {
 		ServerNrf: nrf,
 		router:    logger_util.NewGinWithLogrus(logger.GinLog),
 	}
-	s.router.Use(metrics.InboundMetrics())
+	//add
+	s.router.Use(
+		otelgin.Middleware("nrf-sbi-server"),
+		metrics.InboundMetrics(),
+	)
+	// s.router.Use(metrics.InboundMetrics())
 	cfg := s.Config()
 	bindAddr := cfg.GetSbiBindingAddr()
 	logger.SBILog.Infof("Binding addr: [%s]", bindAddr)

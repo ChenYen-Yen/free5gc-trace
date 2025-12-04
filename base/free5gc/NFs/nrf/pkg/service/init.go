@@ -21,6 +21,17 @@ import (
 	"github.com/free5gc/util/metrics"
 	"github.com/free5gc/util/metrics/utils"
 	"github.com/free5gc/util/mongoapi"
+
+	//add
+	"fmt"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
 var NRF *NrfApp
@@ -173,6 +184,20 @@ func (a *NrfApp) Start() {
 		return
 	}
 
+	//add
+	ctx := a.ctx
+
+	tp, err := initTracerProvider(ctx, "nrf")
+	if err != nil {
+		logger.AppLog.Warnf("Failed to init tracer provider: %+v", err)
+		// tracing 掛掉先不影響 NRF 本身啟動
+	}
+	if tp != nil {
+		defer func() {
+			_ = tp.Shutdown(ctx)
+		}()
+	}
+
 	logger.InitLog.Infoln("Server starting")
 
 	a.wg.Add(1)
@@ -250,4 +275,50 @@ func (a *NrfApp) waitNfDeregister(waitTime int) {
 func (a *NrfApp) WaitRoutineStopped() {
 	a.wg.Wait()
 	logger.InitLog.Infof("NRF App terminated")
+}
+
+func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.TracerProvider, error) {
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		return nil, fmt.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT not set")
+	}
+
+	// HTTP OTLP client，endpoint 例如 "tempo:4318"
+	client := otlptracehttp.NewClient(
+		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithInsecure(),
+	)
+
+	exporter, err := otlptrace.New(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := resource.New(
+		ctx,
+		resource.WithFromEnv(),
+		resource.WithTelemetrySDK(),
+		resource.WithHost(),
+		resource.WithAttributes(
+			semconv.ServiceName(serviceName),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		),
+	)
+
+	return tp, nil
 }

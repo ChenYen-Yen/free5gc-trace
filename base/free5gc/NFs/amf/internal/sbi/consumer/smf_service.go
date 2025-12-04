@@ -126,7 +126,7 @@ func (s *nsmfService) SelectSmf(
 
 	ue.GmmLog.Debugf("Search SMF from NRF[%s]", nrfUri)
 
-	result, err := s.consumer.SendSearchNFInstances(nrfUri, models.NrfNfManagementNfType_SMF,
+	result, err := s.consumer.SendSearchNFInstances(ue.TraceContext, nrfUri, models.NrfNfManagementNfType_SMF,
 		models.NrfNfManagementNfType_AMF, &param)
 	if err != nil {
 		return nil, nasMessage.Cause5GMMPayloadWasNotForwarded, err

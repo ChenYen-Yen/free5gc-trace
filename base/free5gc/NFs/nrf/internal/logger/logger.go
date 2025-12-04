@@ -20,6 +20,7 @@ var (
 	AccTokenLog *logrus.Entry
 	DiscLog     *logrus.Entry
 	UtilLog     *logrus.Entry
+	AppLog      *logrus.Entry
 )
 
 func init() {
@@ -41,4 +42,5 @@ func init() {
 	AccTokenLog = NfLog.WithField(logger_util.FieldCategory, "Token")
 	DiscLog = NfLog.WithField(logger_util.FieldCategory, "DISC")
 	UtilLog = NfLog.WithField(logger_util.FieldCategory, "Util")
+	AppLog = NfLog.WithField(logger_util.FieldCategory, "App")
 }

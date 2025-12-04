@@ -9,6 +9,12 @@ import (
 	udm_context "github.com/free5gc/udm/internal/context"
 	"github.com/free5gc/udm/internal/logger"
 	sbi_metrics "github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"net/http"
+	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type nudrService struct {
@@ -42,6 +48,7 @@ func (s *nudrService) CreateUDMClientToUDR(id string) (*Nudr_DataRepository.APIC
 	cfg := Nudr_DataRepository.NewConfiguration()
 	cfg.SetBasePath(uri)
 	cfg.SetMetrics(sbi_metrics.SbiMetricHook)
+	cfg.SetHTTPClient(newOtelHTTPClient()) //add
 	client = Nudr_DataRepository.NewAPIClient(cfg)
 
 	s.nfDRMu.RUnlock()
@@ -92,4 +99,12 @@ func (s *nudrService) getUdrURI(id string) string {
 		return s.consumer.SendNFInstancesUDR(id, NFDiscoveryToUDRParamGpsi)
 	}
 	return s.consumer.SendNFInstancesUDR("", NFDiscoveryToUDRParamNone)
+}
+
+// add
+func newOtelHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+		Timeout:   30 * time.Second,
+	}
 }

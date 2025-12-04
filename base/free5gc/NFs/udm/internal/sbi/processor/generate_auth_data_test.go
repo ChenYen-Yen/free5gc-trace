@@ -73,7 +73,7 @@ func TestGenerateAuthDataProcedure(t *testing.T) {
 	}
 	httpRecorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(httpRecorder)
-	testProcessor.GenerateAuthDataProcedure(nil, c, authInfoReq, "imsi-208930000000001")
+	testProcessor.GenerateAuthDataProcedure(c.Request.Context(), c, authInfoReq, "imsi-208930000000001")
 
 	httpResp := httpRecorder.Result()
 	if errClose := httpResp.Body.Close(); errClose != nil {

@@ -17,10 +17,29 @@ import (
 
 	"github.com/free5gc/udr/internal/logger"
 	"github.com/free5gc/util/metrics/sbi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (p *Processor) QueryAmDataProcedure(c *gin.Context, collName string, ueId string, servingPlmnId string) {
 	logger.DataRepoLog.Infof("QueryAmDataProcedure: ueId: %s, servingPlmnId: %s", ueId, servingPlmnId)
+
+	//add
+	ctx, span := otel.Tracer("udr-processor").Start(
+		c.Request.Context(),
+		"UDR QueryAmData",
+	)
+	span.SetAttributes(
+		attribute.String("ue.id", ueId),
+		attribute.String("serving_plmn", servingPlmnId),
+		attribute.String("udr.collection", "AccessAndMobilitySubscriptionData"),
+	)
+	defer span.End()
+
+	// 讓後面如果還有用 Request.Context()，都接到這個 span
+	c.Request = c.Request.WithContext(ctx)
 
 	filter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
 	data, pd := p.GetDataFromDB(collName, filter)

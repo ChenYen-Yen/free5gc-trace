@@ -22,11 +22,30 @@ import (
 	"github.com/free5gc/udr/internal/util"
 	"github.com/free5gc/util/metrics/sbi"
 	"github.com/free5gc/util/mongoapi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (p *Processor) QuerySmDataProcedure(c *gin.Context, collName string, ueId string, servingPlmnId string,
 	singleNssai models.Snssai, dnn string,
 ) {
+	//add
+	ctx, span := otel.Tracer("udr-processor").Start(
+		c.Request.Context(),
+		"UDR QuerySmData",
+	)
+	span.SetAttributes(
+		attribute.String("ue.id", ueId),
+		attribute.String("serving_plmn", servingPlmnId),
+		attribute.String("udr.collection", collName),
+		attribute.String("dnn", dnn),
+	)
+	defer span.End()
+
+	c.Request = c.Request.WithContext(ctx)
+
 	filter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
 
 	if !reflect.DeepEqual(singleNssai, models.Snssai{}) {

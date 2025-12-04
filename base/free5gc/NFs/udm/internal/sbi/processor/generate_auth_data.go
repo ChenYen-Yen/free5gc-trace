@@ -92,7 +92,7 @@ func (p *Processor) ConfirmAuthDataProcedure(
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UEAU ConfirmAuthDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: ConfirmAuthDataProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
 		attribute.String("serving_network", authEvent.ServingNetworkName),
@@ -152,7 +152,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 		baseCtx = context.Background()
 	}
 
-	_, span := tracer.Start(baseCtx, "UDM UEAU GenerateAuthDataProcedure")
+	_, span := tracer.Start(baseCtx, "UDM → UDR: GenerateAuthDataProcedure")
 	span.SetAttributes(
 		attribute.String("ue.id", supiOrSuci), // 還沒轉成 SUPI 前先記下 id
 		attribute.String("serving_network", authInfoRequest.ServingNetworkName),

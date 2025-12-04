@@ -20,6 +20,10 @@ import (
 	"github.com/free5gc/udr/internal/util"
 	"github.com/free5gc/util/metrics/sbi"
 	"github.com/free5gc/util/mongoapi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (p *Processor) AmfContext3gppProcedure(
@@ -53,6 +57,19 @@ func (p *Processor) CreateAmfContext3gppProcedure(c *gin.Context, collName strin
 }
 
 func (p *Processor) QueryAmfContext3gppProcedure(c *gin.Context, collName string, ueId string) {
+	//add
+	ctx, span := otel.Tracer("udr-processor").Start(
+		c.Request.Context(),
+		"UDR QueryAmfContext3gpp",
+	)
+	span.SetAttributes(
+		attribute.String("ue.id", ueId),
+		attribute.String("udr.collection", collName),
+	)
+	defer span.End()
+
+	c.Request = c.Request.WithContext(ctx)
+
 	filter := bson.M{"ueId": ueId}
 	data, pd := p.GetDataFromDB(collName, filter)
 	if pd != nil {

@@ -23,6 +23,15 @@ import (
 	"github.com/free5gc/util/metrics"
 	"github.com/free5gc/util/metrics/utils"
 	"github.com/free5gc/util/mongoapi"
+
+	//add
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
 type UdrApp struct {
@@ -184,7 +193,21 @@ func (a *UdrApp) deregisterFromNrf() {
 }
 
 func (a *UdrApp) Start() {
-	err := a.registerToNrf(a.ctx)
+	//add
+	ctx := a.ctx
+
+	// 初始化 TracerProvider（stdout 版本，之後你要換 OTLP 也容易）
+	tp, err := initTracerProvider(ctx, "udr")
+	if err != nil {
+		logger.InitLog.Warnf("Failed to init tracer provider: %+v", err)
+	}
+	if tp != nil {
+		defer func() {
+			_ = tp.Shutdown(ctx)
+		}()
+	}
+
+	err = a.registerToNrf(a.ctx)
 	if err != nil {
 		logger.InitLog.Errorf("register to NRF failed: %v", err)
 	} else {
@@ -256,4 +279,50 @@ func (a *UdrApp) CallServerStop() {
 func (a *UdrApp) WaitRoutineStopped() {
 	a.wg.Wait()
 	logger.MainLog.Infof("UDR terminated")
+}
+
+func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.TracerProvider, error) {
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		return nil, fmt.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT not set")
+	}
+
+	// HTTP OTLP client，endpoint 例如 "tempo:4318"
+	client := otlptracehttp.NewClient(
+		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithInsecure(),
+	)
+
+	exporter, err := otlptrace.New(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := resource.New(
+		ctx,
+		resource.WithFromEnv(),
+		resource.WithTelemetrySDK(),
+		resource.WithHost(),
+		resource.WithAttributes(
+			semconv.ServiceName(serviceName),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		),
+	)
+
+	return tp, nil
 }
