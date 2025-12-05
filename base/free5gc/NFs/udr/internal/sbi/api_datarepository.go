@@ -841,7 +841,9 @@ func (s *Server) HandleCreateAmfContext3gpp(c *gin.Context) {
 
 // HTTPQueryAmfContext3gpp - Retrieves the AMF context data of a UE using 3gpp access
 func (s *Server) HandleQueryAmfContext3gpp(c *gin.Context) {
-	logger.DataRepoLog.Tracef("Handle QueryAmfContext3gpp")
+	ctx := c.Request.Context()
+	traceLog := logger.WithTraceContext(ctx, logger.DataRepoLog)
+	traceLog.Infof("Handle QueryAmfContext3gpp")
 
 	ueId := c.Params.ByName("ueId")
 	collName := "subscriptionData.contextData.amf3gppAccess"
@@ -961,7 +963,9 @@ func (s *Server) HandleQueryAmfContextNon3gpp(c *gin.Context) {
 
 // HTTPQueryAmData - Retrieves the access and mobility subscription data of a UE
 func (s *Server) HandleQueryAmData(c *gin.Context) {
-	logger.DataRepoLog.Tracef("Handle QueryAmData")
+	ctx := c.Request.Context()
+	traceLog := logger.WithTraceContext(ctx, logger.DataRepoLog)
+	traceLog.Infof("Handle QueryAmData")
 
 	collName := "subscriptionData.provisionedData.amData"
 	servingPlmnId := c.Params.ByName("servingPlmnId")
@@ -1079,7 +1083,9 @@ func (s *Server) HandleModifyAuthentication(c *gin.Context) {
 
 // HTTPQueryAuthSubsData - Retrieves the authentication subscription data of a UE
 func (s *Server) HandleQueryAuthSubsData(c *gin.Context) {
-	logger.DataRepoLog.Tracef("Handle QueryAuthSubsData")
+	ctx := c.Request.Context()
+	traceLog := logger.WithTraceContext(ctx, logger.DataRepoLog)
+	traceLog.Infof("Handle QueryAuthSubsData")
 
 	collName := "subscriptionData.authenticationData.authenticationSubscription"
 	ueId := c.Params.ByName("ueId")
