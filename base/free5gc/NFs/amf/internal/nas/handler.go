@@ -124,9 +124,6 @@ func HandleNAS(ranUe *amf_context.RanUe, procedureCode int64, nasPdu []byte, ini
 		)
 	}
 
-	spanCtx := span.SpanContext()
-	ranUe.AmfUe.NASLog.Infof("N1 span traceID=%s", spanCtx.TraceID().String())
-
 	isNasMsgRcv = true
 
 	if errDispatch := Dispatch(ranUe.AmfUe, ranUe.Ran.AnType, procedureCode, msg); errDispatch != nil {

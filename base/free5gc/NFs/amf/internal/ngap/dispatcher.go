@@ -8,7 +8,6 @@ import (
 	"github.com/free5gc/amf/internal/logger"
 	"github.com/free5gc/ngap"
 	"github.com/free5gc/sctp"
-	"go.opentelemetry.io/otel/trace"
 )
 
 func Dispatch(conn net.Conn, msg []byte) {
@@ -42,11 +41,6 @@ func DispatchWithContext(ctx stdctx.Context, conn net.Conn, msg []byte) {
 		baseLog := logger.NgapLog.WithField(logger.FieldRanAddr, addrStr)
 		// attach current ctx's trace/span to ran.Log
 		ran.Log = logger.WithTraceContext(ctx, baseLog)
-
-		// log debug info about the span context so we can observe whether
-		// a valid span is present on the incoming ctx
-		sc := trace.SpanFromContext(ctx).SpanContext()
-		logger.NgapLog.Infof("DispatchWithContext: span valid=%v trace=%s span=%s", sc.IsValid(), sc.TraceID().String(), sc.SpanID().String())
 	}
 
 	if len(msg) == 0 {

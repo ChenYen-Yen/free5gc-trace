@@ -33,6 +33,8 @@ func init() {
 	}
 
 	Log = logger_util.New(fieldsOrder)
+	// use JSON formatter so structured fields (trace_id/span_id) appear as JSON keys
+	Log.SetFormatter(&logrus.JSONFormatter{})
 	NfLog = Log.WithField(logger_util.FieldNF, "AUSF")
 	MainLog = NfLog.WithField(logger_util.FieldCategory, "Main")
 	InitLog = NfLog.WithField(logger_util.FieldCategory, "Init")
