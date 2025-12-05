@@ -36,7 +36,8 @@ func (p *Processor) HandleNFDeregisterRequest(c *gin.Context, nfInstanceId strin
 
 	span.SetAttributes(attribute.String("nf.instance_id", nfInstanceId))
 
-	logger.NfmLog.Infoln("Handle NFDeregisterRequest")
+	traceLog := logger.WithTraceContext(ctx, logger.NfmLog)
+	traceLog.Infoln("Handle NFDeregisterRequest")
 
 	problemDetails := p.NFDeregisterProcedure(nfInstanceId)
 
@@ -48,13 +49,31 @@ func (p *Processor) HandleNFDeregisterRequest(c *gin.Context, nfInstanceId strin
 }
 
 func (p *Processor) HandleGetNFInstanceRequest(c *gin.Context, nfInstanceId string) {
-	logger.NfmLog.Infoln("Handle GetNFInstanceRequest")
+	ctx := c.Request.Context()
+	tracer := otel.Tracer("nrf-processor")
+	ctx, span := tracer.Start(ctx, "NRF GetNFInstance")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
+	span.SetAttributes(attribute.String("nf.instance_id", nfInstanceId))
+	traceLog := logger.WithTraceContext(ctx, logger.NfmLog)
+	traceLog.Infoln("Handle GetNFInstanceRequest")
 
 	p.GetNFInstanceProcedure(c, nfInstanceId)
 }
 
 func (p *Processor) HandleNFRegisterRequest(c *gin.Context, nfProfile *models.NrfNfManagementNfProfile) {
-	logger.NfmLog.Infoln("Handle NFRegisterRequest")
+	ctx := c.Request.Context()
+	tracer := otel.Tracer("nrf-processor")
+	ctx, span := tracer.Start(ctx, "NRF NFRegister")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
+	if nfProfile != nil && nfProfile.NfInstanceId != "" {
+		span.SetAttributes(attribute.String("nf.instance_id", nfProfile.NfInstanceId))
+	}
+	traceLog := logger.WithTraceContext(ctx, logger.NfmLog)
+	traceLog.Infoln("Handle NFRegisterRequest")
 
 	p.NFRegisterProcedure(c, nfProfile)
 }
