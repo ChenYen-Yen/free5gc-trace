@@ -197,7 +197,8 @@ func (p *Processor) RegistrationAmf3gppAccessProcedure(baseCtx context.Context, 
 			}
 
 			go func() {
-				logger.UecmLog.Infof("Send DeregNotify to old AMF GUAMI=%v", oldAmf3GppAccessRegContext.Guami)
+				traceLog := logger.WithTraceContext(ctxForHTTP, logger.UecmLog)
+				traceLog.Infof("Send DeregNotify to old AMF GUAMI=%v", oldAmf3GppAccessRegContext.Guami)
 				span.SetAttributes(
 					attribute.Bool("to_AMF", true),
 				)
@@ -205,7 +206,7 @@ func (p *Processor) RegistrationAmf3gppAccessProcedure(baseCtx context.Context, 
 					oldAmf3GppAccessRegContext.DeregCallbackUri,
 					deregistData) // Deregistration Notify Triggered
 				if pd != nil {
-					logger.UecmLog.Errorf("RegistrationAmf3gppAccess: send DeregNotify fail %v", pd)
+					traceLog.Errorf("RegistrationAmf3gppAccess: send DeregNotify fail %v", pd)
 				}
 			}()
 		}
@@ -284,14 +285,15 @@ func (p *Processor) RegisterAmfNon3gppAccessProcedure(baseCtx context.Context, c
 		}
 
 		go func() {
-			logger.UecmLog.Infof("Send DeregNotify to old AMF GUAMI=%v", oldAmfNon3GppAccessRegContext.Guami)
+			traceLog := logger.WithTraceContext(ctxForHTTP, logger.UecmLog)
+			traceLog.Infof("Send DeregNotify to old AMF GUAMI=%v", oldAmfNon3GppAccessRegContext.Guami)
 			span.SetAttributes(
 				attribute.Bool("to_AMF", true),
 			)
 			pd := p.SendOnDeregistrationNotification(ctxForHTTP, ueID, oldAmfNon3GppAccessRegContext.DeregCallbackUri, //add
 				deregistData) // Deregistration Notify Triggered
 			if pd != nil {
-				logger.UecmLog.Errorf("RegisterAmfNon3gppAccess: send DeregNotify fail %v", pd)
+				traceLog.Errorf("RegisterAmfNon3gppAccess: send DeregNotify fail %v", pd)
 			}
 		}()
 
@@ -328,10 +330,11 @@ func (p *Processor) UpdateAmf3gppAccessProcedure(
 		return
 	}
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	traceLog := logger.WithTraceContext(ctxForHTTP, logger.UecmLog)
 	var patchItemReqArray []models.PatchItem
 	currentContext := p.Context().GetAmf3gppRegContext(ueID)
 	if currentContext == nil {
-		logger.UecmLog.Errorln("[UpdateAmf3gppAccess] Empty Amf3gppRegContext")
+		traceLog.Errorln("[UpdateAmf3gppAccess] Empty Amf3gppRegContext")
 		problemDetails := &models.ProblemDetails{
 			Status: http.StatusNotFound,
 			Cause:  "CONTEXT_NOT_FOUND",
@@ -344,10 +347,10 @@ func (p *Processor) UpdateAmf3gppAccessProcedure(
 	if request.Guami != nil {
 		udmUe, _ := p.Context().UdmUeFindBySupi(ueID)
 		if udmUe.SameAsStoredGUAMI3gpp(*request.Guami) { // deregistration
-			logger.UecmLog.Infoln("UpdateAmf3gppAccess - deregistration")
+			traceLog.Infoln("UpdateAmf3gppAccess - deregistration")
 			request.PurgeFlag = true
 		} else {
-			logger.UecmLog.Errorln("INVALID_GUAMI")
+			traceLog.Errorln("INVALID_GUAMI")
 			problemDetails := &models.ProblemDetails{
 				Status: http.StatusForbidden,
 				Cause:  "INVALID_GUAMI",
@@ -458,10 +461,11 @@ func (p *Processor) UpdateAmfNon3gppAccessProcedure(
 	}
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 
+	traceLog := logger.WithTraceContext(ctxForHTTP, logger.UecmLog)
 	var patchItemReqArray []models.PatchItem
 	currentContext := p.Context().GetAmfNon3gppRegContext(ueID)
 	if currentContext == nil {
-		logger.UecmLog.Errorln("[UpdateAmfNon3gppAccess] Empty AmfNon3gppRegContext")
+		traceLog.Errorln("[UpdateAmfNon3gppAccess] Empty AmfNon3gppRegContext")
 		problemDetails := &models.ProblemDetails{
 			Status: http.StatusNotFound,
 			Cause:  "CONTEXT_NOT_FOUND",
@@ -474,10 +478,10 @@ func (p *Processor) UpdateAmfNon3gppAccessProcedure(
 	if request.Guami != nil {
 		udmUe, _ := p.Context().UdmUeFindBySupi(ueID)
 		if udmUe.SameAsStoredGUAMINon3gpp(*request.Guami) { // deregistration
-			logger.UecmLog.Infoln("UpdateAmfNon3gppAccess - deregistration")
+			traceLog.Infoln("UpdateAmfNon3gppAccess - deregistration")
 			request.PurgeFlag = true
 		} else {
-			logger.UecmLog.Errorln("INVALID_GUAMI")
+			traceLog.Errorln("INVALID_GUAMI")
 			problemDetails := &models.ProblemDetails{
 				Status: http.StatusForbidden,
 				Cause:  "INVALID_GUAMI",
@@ -646,6 +650,7 @@ func (p *Processor) RegistrationSmfRegistrationsProcedure(
 		return
 	}
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	traceLog := logger.WithTraceContext(ctxForHTTP, logger.UecmLog)
 	contextExisted := false
 	p.Context().CreateSmfRegContext(ueID, pduSessionID)
 	if !p.Context().UdmSmfRegContextNotExists(ueID) {
@@ -654,7 +659,7 @@ func (p *Processor) RegistrationSmfRegistrationsProcedure(
 
 	pduID64, err := strconv.ParseInt(pduSessionID, 10, 32)
 	if err != nil {
-		logger.UecmLog.Errorln(err.Error())
+		traceLog.Errorln(err.Error())
 	}
 	pduID32 := int32(pduID64)
 
