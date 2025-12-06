@@ -78,7 +78,8 @@ func (s *Server) getNssaiAvailabilityRoutes() []Route {
 // NSSAIAvailabilityDelete - Deletes an already existing S-NSSAIs per TA
 // provided by the NF service consumer (e.g AMF)
 func (s *Server) NSSAIAvailabilityDelete(c *gin.Context) {
-	logger.NssaiavailLog.Infof("Handle NSSAIAvailabilityDelete")
+	traceLog := logger.WithTraceContext(c.Request.Context(), logger.NssaiavailLog)
+	traceLog.Infof("Handle NSSAIAvailabilityDelete")
 
 	nfId := c.Params.ByName("nfId")
 
@@ -98,7 +99,8 @@ func (s *Server) NSSAIAvailabilityDelete(c *gin.Context) {
 // NSSAIAvailabilityPatch - Updates an already existing S-NSSAIs per TA
 // provided by the NF service consumer (e.g AMF)
 func (s *Server) NSSAIAvailabilityPatch(c *gin.Context) {
-	logger.NssaiavailLog.Infof("Handle NSSAIAvailabilityPatch")
+	traceLog := logger.WithTraceContext(c.Request.Context(), logger.NssaiavailLog)
+	traceLog.Infof("Handle NSSAIAvailabilityPatch")
 
 	nfId := c.Params.ByName("nfId")
 
@@ -131,7 +133,7 @@ func (s *Server) NSSAIAvailabilityPatch(c *gin.Context) {
 			Cause:  "UNSPECIFIED", // TODO: Check if this is the correct cause
 		}
 
-		logger.SBILog.Errorf("Error deserializing patch document: %+v", err)
+		traceLog.Errorf("Error deserializing patch document: %+v", err)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		util.GinProblemJson(c, problemDetails)
 		return
@@ -152,7 +154,8 @@ type NssaiAvailabilityPutParams struct {
 // NSSAIAvailabilityPut - Updates/replaces the NSSF
 // with the S-NSSAIs the NF service consumer (e.g AMF) supports per TA
 func (s *Server) NSSAIAvailabilityPut(c *gin.Context) {
-	logger.NssaiavailLog.Infof("Handle NSSAIAvailabilityPut")
+	traceLog := logger.WithTraceContext(c.Request.Context(), logger.NssaiavailLog)
+	traceLog.Infof("Handle NSSAIAvailabilityPut")
 
 	var params NssaiAvailabilityPutParams
 	if err := c.ShouldBindUri(&params); err != nil {
@@ -185,7 +188,7 @@ func (s *Server) NSSAIAvailabilityPut(c *gin.Context) {
 			Cause:  "UNSPECIFIED", // TODO: Check if this is the correct cause
 		}
 
-		logger.SBILog.Errorf("Error deserializing NSSAI availability info: %+v", err)
+		traceLog.Errorf("Error deserializing NSSAI availability info: %+v", err)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		util.GinProblemJson(c, problemDetails)
 		return
@@ -199,6 +202,8 @@ func (s *Server) NSSAIAvailabilitySubscriptionPatch(c *gin.Context) {
 }
 
 func (s *Server) NSSAIAvailabilityPost(c *gin.Context) {
+	traceLog := logger.WithTraceContext(c.Request.Context(), logger.NssaiavailLog)
+
 	var createData models.NssfEventSubscriptionCreateData
 
 	requestBody, err := c.GetRawData()
@@ -209,7 +214,7 @@ func (s *Server) NSSAIAvailabilityPost(c *gin.Context) {
 			Detail: err.Error(),
 			Cause:  "SYSTEM_FAILURE",
 		}
-		logger.NssaiavailLog.Errorf("Get Request Body error: %+v", err)
+		traceLog.Errorf("Get Request Body error: %+v", err)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetail.Cause)
 		util.GinProblemJson(c, problemDetail)
 		return
@@ -223,7 +228,7 @@ func (s *Server) NSSAIAvailabilityPost(c *gin.Context) {
 			Status: http.StatusBadRequest,
 			Detail: problemDetail,
 		}
-		logger.NssaiavailLog.Errorln(problemDetail)
+		traceLog.Errorln(problemDetail)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, rsp.Title)
 		util.GinProblemJson(c, rsp)
 		return

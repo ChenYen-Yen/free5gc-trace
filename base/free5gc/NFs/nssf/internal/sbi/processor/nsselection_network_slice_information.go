@@ -10,6 +10,7 @@
 package processor
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -122,10 +123,10 @@ func (p *Processor) NSSelectionSliceInformationGet(
 
 	if param.SliceInfoRequestForRegistration != nil {
 		// Network slice information is requested during the Registration procedure
-		status, response, problemDetails = nsselectionForRegistration(param)
+		status, response, problemDetails = nsselectionForRegistration(ctx, param)
 	} else {
 		// Network slice information is requested during the PDU session establishment procedure
-		status, response, problemDetails = nsselectionForPduSession(param)
+		status, response, problemDetails = nsselectionForPduSession(ctx, param)
 	}
 
 	// TODO: Handle `SliceInfoRequestForUeConfigurationUpdate`
@@ -150,15 +151,18 @@ func (p *Processor) NSSelectionSliceInformationGet(
 
 // Set Allowed NSSAI with Subscribed S-NSSAI(s) which are marked as default S-NSSAI(s)
 func useDefaultSubscribedSnssai(
+	ctx context.Context,
 	param NetworkSliceInformationGetQuery, authorizedNetworkSliceInfo *models.AuthorizedNetworkSliceInfo,
 ) {
+	traceLog := logger.WithTraceContext(ctx, logger.NsselLog)
+
 	var mappingOfSnssai []models.MappingOfSnssai
 	if param.HomePlmnId != nil {
 		// Find mapping of Subscribed S-NSSAI of UE's HPLMN to S-NSSAI in Serving PLMN from NSSF configuration
 		mappingOfSnssai = util.GetMappingOfPlmnFromConfig(*param.HomePlmnId)
 
 		if mappingOfSnssai == nil {
-			logger.NsselLog.Warnf("No S-NSSAI mapping of UE's HPLMN %+v in NSSF configuration", *param.HomePlmnId)
+			traceLog.Warnf("No S-NSSAI mapping of UE's HPLMN %+v in NSSF configuration", *param.HomePlmnId)
 			return
 		}
 	}
@@ -173,7 +177,7 @@ func useDefaultSubscribedSnssai(
 				targetMapping, found := util.FindMappingWithHomeSnssai(*subscribedSnssai.SubscribedSnssai, mappingOfSnssai)
 
 				if !found {
-					logger.NsselLog.Warnf("No mapping of Subscribed S-NSSAI %+v in PLMN %+v in NSSF configuration",
+					traceLog.Warnf("No mapping of Subscribed S-NSSAI %+v in PLMN %+v in NSSF configuration",
 						*subscribedSnssai.SubscribedSnssai,
 						*param.HomePlmnId)
 					continue
@@ -218,12 +222,15 @@ func useDefaultSubscribedSnssai(
 
 // Set Configured NSSAI with S-NSSAI(s) in Requested NSSAI which are marked as Default Configured NSSAI
 func useDefaultConfiguredNssai(
+	ctx context.Context,
 	param NetworkSliceInformationGetQuery, authorizedNetworkSliceInfo *models.AuthorizedNetworkSliceInfo,
 ) {
+	traceLog := logger.WithTraceContext(ctx, logger.NsselLog)
+
 	for _, requestedSnssai := range param.SliceInfoRequestForRegistration.RequestedNssai {
 		// Check whether the Default Configured S-NSSAI is standard, which could be commonly decided by all roaming partners
 		if !util.CheckStandardSnssai(requestedSnssai) {
-			logger.NsselLog.Infof("S-NSSAI %+v in Requested NSSAI which based on Default Configured NSSAI is not standard",
+			traceLog.Infof("S-NSSAI %+v in Requested NSSAI which based on Default Configured NSSAI is not standard",
 				requestedSnssai)
 			continue
 		}
@@ -246,15 +253,18 @@ func useDefaultConfiguredNssai(
 
 // Set Configured NSSAI with Subscribed S-NSSAI(s)
 func setConfiguredNssai(
+	ctx context.Context,
 	param NetworkSliceInformationGetQuery, authorizedNetworkSliceInfo *models.AuthorizedNetworkSliceInfo,
 ) {
+	traceLog := logger.WithTraceContext(ctx, logger.NsselLog)
+
 	var mappingOfSnssai []models.MappingOfSnssai
 	if param.HomePlmnId != nil {
 		// Find mapping of Subscribed S-NSSAI of UE's HPLMN to S-NSSAI in Serving PLMN from NSSF configuration
 		mappingOfSnssai = util.GetMappingOfPlmnFromConfig(*param.HomePlmnId)
 
 		if mappingOfSnssai == nil {
-			logger.NsselLog.Warnf("No S-NSSAI mapping of UE's HPLMN %+v in NSSF configuration", *param.HomePlmnId)
+			traceLog.Warnf("No S-NSSAI mapping of UE's HPLMN %+v in NSSF configuration", *param.HomePlmnId)
 			return
 		}
 	}
@@ -265,7 +275,7 @@ func setConfiguredNssai(
 			targetMapping, found := util.FindMappingWithHomeSnssai(*subscribedSnssai.SubscribedSnssai, mappingOfSnssai)
 
 			if !found {
-				logger.NsselLog.Warnf("No mapping of Subscribed S-NSSAI %+v in PLMN %+v in NSSF configuration",
+				traceLog.Warnf("No mapping of Subscribed S-NSSAI %+v in PLMN %+v in NSSF configuration",
 					*subscribedSnssai.SubscribedSnssai,
 					*param.HomePlmnId)
 				continue
@@ -294,9 +304,11 @@ func setConfiguredNssai(
 
 // Network slice selection for registration
 // The function is executed when the IE, `slice-info-request-for-registration`, is provided in query parameters
-func nsselectionForRegistration(param NetworkSliceInformationGetQuery) (
+func nsselectionForRegistration(ctx context.Context, param NetworkSliceInformationGetQuery) (
 	int, *models.AuthorizedNetworkSliceInfo, *models.ProblemDetails,
 ) {
+	traceLog := logger.WithTraceContext(ctx, logger.NsselLog)
+
 	authorizedNetworkSliceInfo := &models.AuthorizedNetworkSliceInfo{}
 
 	var status int
@@ -394,7 +406,7 @@ func nsselectionForRegistration(param NetworkSliceInformationGetQuery) (
 				targetMapping, found := util.FindMappingWithHomeSnssai(snssai, mappingOfSnssai)
 
 				if !found {
-					logger.NsselLog.Warnf("No mapping of Subscribed S-NSSAI %+v in PLMN %+v in NSSF configuration",
+					traceLog.Warnf("No mapping of Subscribed S-NSSAI %+v in PLMN %+v in NSSF configuration",
 						snssai,
 						*param.HomePlmnId)
 					continue
@@ -538,13 +550,13 @@ func nsselectionForRegistration(param NetworkSliceInformationGetQuery) (
 		if !checkIfRequestAllowed {
 			// No S-NSSAI from Requested NSSAI is present in Subscribed S-NSSAIs
 			// Subscribed S-NSSAIs marked as default are used
-			useDefaultSubscribedSnssai(param, authorizedNetworkSliceInfo)
+			useDefaultSubscribedSnssai(ctx, param, authorizedNetworkSliceInfo)
 		}
 	} else {
 		// No Requested NSSAI is provided
 		// Subscribed S-NSSAIs marked as default are used
 		checkInvalidRequestedNssai = true
-		useDefaultSubscribedSnssai(param, authorizedNetworkSliceInfo)
+		useDefaultSubscribedSnssai(ctx, param, authorizedNetworkSliceInfo)
 	}
 
 	if param.Tai != nil &&
@@ -555,14 +567,14 @@ func nsselectionForRegistration(param NetworkSliceInformationGetQuery) (
 	if param.SliceInfoRequestForRegistration.DefaultConfiguredSnssaiInd {
 		// Default Configured NSSAI Indication is received from AMF
 		// Determine the Configured NSSAI based on the Default Configured NSSAI
-		useDefaultConfiguredNssai(param, authorizedNetworkSliceInfo)
+		useDefaultConfiguredNssai(ctx, param, authorizedNetworkSliceInfo)
 	} else if checkInvalidRequestedNssai {
 		// No Requested NSSAI is provided or the Requested NSSAI includes an S-NSSAI that is not valid
 		// Determine the Configured NSSAI based on the subscription
 		// Configure available NSSAI for UE in its PLMN
 		// If TAI is not provided, then unable to check if S-NSSAIs is supported in the PLMN
 		if param.Tai != nil {
-			setConfiguredNssai(param, authorizedNetworkSliceInfo)
+			setConfiguredNssai(ctx, param, authorizedNetworkSliceInfo)
 		}
 	}
 
@@ -581,9 +593,11 @@ func selectNsiInformation(nsiInformationList []models.NsiInformation) models.Nsi
 
 // Network slice selection for PDU session
 // The function is executed when the IE, `slice-info-for-pdu-session`, is provided in query parameters
-func nsselectionForPduSession(param NetworkSliceInformationGetQuery) (
+func nsselectionForPduSession(ctx context.Context, param NetworkSliceInformationGetQuery) (
 	int, *models.AuthorizedNetworkSliceInfo, *models.ProblemDetails,
 ) {
+	traceLog := logger.WithTraceContext(ctx, logger.NsselLog)
+
 	var status int
 	authorizedNetworkSliceInfo := &models.AuthorizedNetworkSliceInfo{}
 
@@ -687,7 +701,7 @@ func nsselectionForPduSession(param NetworkSliceInformationGetQuery) (
 		*authorizedNetworkSliceInfo.NsiInformation = nsiInformation
 	}
 
-	logger.NsselLog.Infof("authorizedNetworkSliceInfo: %+v", authorizedNetworkSliceInfo)
+	traceLog.Infof("authorizedNetworkSliceInfo: %+v", authorizedNetworkSliceInfo)
 
 	return http.StatusOK, authorizedNetworkSliceInfo, nil
 }

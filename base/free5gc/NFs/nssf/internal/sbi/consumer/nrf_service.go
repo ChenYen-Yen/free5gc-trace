@@ -133,6 +133,14 @@ func (ns *NrfService) SendDeregisterNFInstance(nfInstanceId string) (*models.Pro
 		return pd, err
 	}
 
+	//add
+	tracer := otel.Tracer("nssf-sbi")
+	ctx, span := tracer.Start(ctx, "NSSF → NRF: DeregisterNFInstance")
+	span.SetAttributes(
+		attribute.String("nf.instance_id", nfInstanceId),
+	)
+	defer span.End()
+
 	client := ns.nrfNfMgmtClient
 
 	req := &NFManagement.DeregisterNFInstanceRequest{
