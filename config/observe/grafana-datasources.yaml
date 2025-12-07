@@ -8,6 +8,11 @@ datasources:
     isDefault: true
     jsonData:
       maxLines: 1000
+      derivedFields:
+        - name: span_id
+          matcherRegex: '"span_id":"([a-f0-9]+)"'
+          url: '{span:id="$${__value.raw}"}'
+          datasourceUid: Tempo
 
   - name: Prometheus
     type: prometheus
@@ -19,8 +24,14 @@ datasources:
     access: proxy
     url: http://tempo:3200
     jsonData:
-      tracesToLogs:
-        datasourceUid: loki
-        tags: ['container_name']
       nodeGraph:
         enabled: true
+      tracesToLogsV2:
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        customQuery: true
+        datasourceUid: Loki
+        query: '{service_name="$${__span.tags["service.name"]}"} |= `$${__span.spanId}`'
+        tags:
+          - key: service.name
+            value: service_name

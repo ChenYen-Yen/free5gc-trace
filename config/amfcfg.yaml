@@ -10,7 +10,7 @@ configuration:
   sbi: # Service-based interface information
     scheme: http # the protocol for sbi (http or https)
     registerIPv4: amf.free5gc.org # IP used to register to NRF
-    bindingIPv4: amf.free5gc.org  # IP used to bind the service
+    bindingIPv4: 0.0.0.0  # IP used to bind the service
     port: 8000 # port used to bind the service
     tls: # the local path of TLS key
       pem: cert/amf.pem # AMF TLS Certificate
@@ -122,7 +122,7 @@ configuration:
   # Metrics configuration
   # If using the same bindingIPv4 as the sbi server, make sure that the ports are different
   metrics:
-    enable: false # (Optional, default false)
+    enable: true # (Optional, default false)
     scheme: http # (Required) the protocol for metrics (http or https, default https)
     bindingIPv4: amf.free5gc.org # (Required) IP used to bind the metrics endpoint (default 0.0.0.0)
     port: 9091 # (Optional, default 9091) port used to bind the service
