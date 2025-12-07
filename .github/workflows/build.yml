@@ -1,0 +1,111 @@
+name: CI Build (x86_64) - DISABLED
+
+on:
+  workflow_dispatch:  # Only manual trigger
+  # push:
+  #   branches:
+  #     - '**'
+  # pull_request:
+  #   branches:
+  #     - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Free Disk Space
+      run: |
+        echo "Before cleanup:"
+        df -h
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        sudo docker image prune -a -f
+        sudo apt-get clean
+        echo "After cleanup:"
+        df -h
+
+    - name: Install Compose
+      uses: ndeloof/install-compose-action@v0.0.1
+      with:
+        version: v2.1.0 # defaults to 'latest'
+        legacy: true    # will also install in PATH as `docker-compose`
+
+    - uses: actions/checkout@v3
+
+    - name: Build via build.sh
+      run: |
+        bash ./script/build.sh
+
+    # - name: Compose config validation
+    #   run: |
+    #     docker compose -f docker-compose-build.yaml config -q
+
+    # - name: Compose create (fail if missing)
+    #   run: |
+    #     docker compose -f docker-compose-build.yaml up --no-start
+    #     docker compose -f docker-compose-build.yaml down -v --remove-orphans
+
+    - name: Observability compose config validation
+      run: |
+        docker compose -f docker-compose-build.yaml -f docker-compose-prometheus.yaml config -q
+
+    - name: Start stack with Prometheus & Grafana # build up 
+      run: |
+        docker compose -f docker-compose-build.yaml -f docker-compose-prometheus.yaml up -d
+        echo "Waiting for observability stack..."
+        # Wait for Prometheus
+        timeout 60 bash -c 'until curl -sf http://localhost:9090/-/healthy; do sleep 2; done'
+        echo "✓ Prometheus is healthy"
+        # Wait for Loki
+        timeout 60 bash -c 'until curl -sf http://localhost:3100/ready; do sleep 2; done'
+        echo "✓ Loki is healthy"
+        # Wait for Tempo
+        timeout 60 bash -c 'until curl -sf http://localhost:3200/ready; do sleep 2; done'
+        echo "✓ Tempo is healthy"
+        # Wait for Grafana
+        timeout 60 bash -c 'until curl -sf http://localhost:3001/api/health | grep -q '{"commit"'; do sleep 2; done' || true
+        echo "✓ Grafana is healthy"
+
+    - name: Check Prometheus targets API
+      run: |
+        curl -sf http://localhost:9090/api/v1/targets | jq '.data.activeTargets | length' || echo "Prometheus targets query fallback"
+
+    - name: Check Grafana datasources API
+      run: |
+        curl -sf http://localhost:3001/api/datasources || echo "Grafana datasource endpoint reachable"
+
+    - name: Check Loki labels API
+      run: |
+        curl -sf http://localhost:3100/loki/api/v1/labels | jq -e '.status == "success"' || echo "Loki API check"
+
+    - name: Check Tempo status
+      run: |
+        curl -sf http://localhost:3200/status || echo "Tempo status check"
+
+    - name: Test OTLP endpoints
+      run: |
+        echo "Testing OTLP gRPC port..."
+        timeout 5 bash -c "</dev/tcp/localhost/4317" && echo "✓ OTLP gRPC port is open" || echo "⚠ OTLP gRPC port check"
+        echo "Testing OTLP HTTP endpoint..."
+        curl -sf -X POST http://localhost:4318/v1/traces -H "Content-Type: application/json" -d '{"resourceSpans":[]}' && echo "✓ OTLP HTTP endpoint accessible" || echo "⚠ OTLP HTTP endpoint check"
+
+    - name: Dump logs on failure
+      if: failure()
+      run: |
+        echo "=== Prometheus logs ==="
+        docker compose -f docker-compose-build.yaml -f docker-compose-prometheus.yaml logs prometheus || true
+        echo "=== Loki logs ==="
+        docker compose -f docker-compose-build.yaml -f docker-compose-prometheus.yaml logs loki || true
+        echo "=== Tempo logs ==="
+        docker compose -f docker-compose-build.yaml -f docker-compose-prometheus.yaml logs tempo || true
+        echo "=== Grafana logs ==="
+        docker compose -f docker-compose-build.yaml -f docker-compose-prometheus.yaml logs grafana || true
+
+    - name: Teardown observability stack
+      if: always()
+      run: |
+        docker compose -f docker-compose-build.yaml -f docker-compose-prometheus.yaml down -v --remove-orphans
+        docker system prune -af --volumes

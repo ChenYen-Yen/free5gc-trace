@@ -1,8 +1,8 @@
 # vscode
 .vscode
 
-mongodb
-base/free5gc
+# mongodb
+# base/free5gc
 
 # cert
 cert/*_*.pem
