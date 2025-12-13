@@ -2087,6 +2087,16 @@ func (s *Server) HandleQuerySmsData(c *gin.Context) {
 func (s *Server) HandleQuerySmData(c *gin.Context) {
 	logger.DataRepoLog.Tracef("Handle QuerySmData")
 
+	problemDetails := models.ProblemDetails{
+		Title:  "Manually Injected 500 Error for SM-Data",
+		Status: http.StatusInternalServerError,
+		Detail: "Failing GetSmData to test Trace/Log jumping",
+		Cause:  "SYSTEM_FAILURE",
+	}
+	// 回傳 500
+	c.JSON(http.StatusInternalServerError, problemDetails)
+	return
+
 	collName := "subscriptionData.provisionedData.smData"
 	ueId := c.Params.ByName("ueId")
 	if ueId == "" {
