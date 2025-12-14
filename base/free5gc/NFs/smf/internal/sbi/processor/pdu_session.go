@@ -22,6 +22,9 @@ import (
 	smf_errors "github.com/free5gc/smf/pkg/errors"
 	"github.com/free5gc/smf/pkg/factory"
 	"github.com/free5gc/util/metrics/sbi"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (p *Processor) HandlePDUSessionSMContextCreate(
@@ -29,6 +32,12 @@ func (p *Processor) HandlePDUSessionSMContextCreate(
 	request models.PostSmContextsRequest,
 	isDone <-chan struct{},
 ) {
+	// Create root span for PDU Session creation
+	ctx := c.Request.Context()
+	tracer := otel.Tracer("smf-processor")
+	ctx, span := tracer.Start(ctx, "SMF PDU Session Create")
+	defer span.End()
+
 	// GSM State
 	// PDU Session Establishment Accept/Reject
 	var response models.PostSmContextsResponse201
@@ -51,6 +60,13 @@ func (p *Processor) HandlePDUSessionSMContextCreate(
 	}
 
 	createData := request.JsonData
+	if createData != nil {
+		span.SetAttributes(
+			attribute.String("ue.supi", createData.Supi),
+			attribute.Int("pdu_session_id", int(createData.PduSessionId)),
+			attribute.String("dnn", createData.Dnn),
+		)
+	}
 	// Check duplicate SM Context
 	if dup_smCtx := smf_context.GetSMContextById(createData.Supi, createData.PduSessionId); dup_smCtx != nil {
 		p.HandlePDUSessionSMContextLocalRelease(dup_smCtx, createData)

@@ -8,6 +8,9 @@ import (
 	"github.com/free5gc/openapi/amf/Communication"
 	"github.com/free5gc/openapi/models"
 	sbi_metrics "github.com/free5gc/util/metrics/sbi"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type namfService struct {
@@ -44,6 +47,14 @@ func (s *namfService) getCommunicationClient(uri string) *Communication.APIClien
 func (s *namfService) N1N2MessageTransfer(
 	ctx context.Context, supi string, n1n2Request models.N1N2MessageTransferRequest, apiPrefix string,
 ) (*models.N1N2MessageTransferRspData, error) {
+	// Create tracing span
+	tracer := otel.Tracer("smf-sbi")
+	ctx, span := tracer.Start(ctx, "SMF → AMF: N1N2MessageTransfer")
+	span.SetAttributes(
+		attribute.String("ue.supi", supi),
+	)
+	defer span.End()
+
 	client := s.getCommunicationClient(apiPrefix)
 	if client == nil {
 		return nil, fmt.Errorf("N1N2MessageTransfer client is nil: (%v)", apiPrefix)

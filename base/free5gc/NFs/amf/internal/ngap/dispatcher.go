@@ -65,7 +65,7 @@ func DispatchWithContext(ctx stdctx.Context, conn net.Conn, msg []byte) {
 		return
 	}
 
-	dispatchMain(ran, pdu)
+	dispatchMain(ctx, ran, pdu)
 }
 
 func HandleSCTPNotification(conn net.Conn, notification sctp.Notification) {

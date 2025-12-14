@@ -2,12 +2,14 @@
 package ngap
 
 import (
+	stdctx "context"
+
 	"github.com/free5gc/amf/internal/context"
 	ngap_message "github.com/free5gc/amf/internal/ngap/message"
 	"github.com/free5gc/ngap/ngapType"
 )
 
-func dispatchMain(ran *context.AmfRan, message *ngapType.NGAPPDU) {
+func dispatchMain(ctx stdctx.Context, ran *context.AmfRan, message *ngapType.NGAPPDU) {
 	switch message.Present {
 	case ngapType.NGAPPDUPresentInitiatingMessage:
 		initiatingMessage := message.InitiatingMessage
@@ -47,7 +49,7 @@ func dispatchMain(ran *context.AmfRan, message *ngapType.NGAPPDU) {
 		case ngapType.ProcedureCodeInitialContextSetup:
 			handlerInitialContextSetupRequest(ran, initiatingMessage)
 		case ngapType.ProcedureCodeInitialUEMessage:
-			handlerInitialUEMessage(ran, message, initiatingMessage)
+			handlerInitialUEMessage(ctx, ran, message, initiatingMessage)
 		case ngapType.ProcedureCodeLocationReport:
 			handlerLocationReport(ran, initiatingMessage)
 		case ngapType.ProcedureCodeLocationReportingControl:

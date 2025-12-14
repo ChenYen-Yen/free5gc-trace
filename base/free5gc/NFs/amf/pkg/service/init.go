@@ -365,8 +365,16 @@ func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.Trac
 		return nil, err
 	}
 
+	// Configure batcher with shorter intervals to reduce "root span not received" issues
+	batchOptions := []sdktrace.BatchSpanProcessorOption{
+		sdktrace.WithMaxExportBatchSize(512), // Default: 512
+		sdktrace.WithBatchTimeout(1000),      // 1 second (default: 5s) - faster export
+		sdktrace.WithExportTimeout(30000),    // 30 seconds
+		sdktrace.WithMaxQueueSize(2048),      // Default: 2048
+	}
+
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
+		sdktrace.WithBatcher(exporter, batchOptions...),
 		sdktrace.WithResource(res),
 	)
 

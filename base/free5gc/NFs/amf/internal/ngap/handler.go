@@ -439,7 +439,7 @@ func handleLocationReportingFailureIndicationMain(ran *context.AmfRan,
 	}
 }
 
-func handleInitialUEMessageMain(ran *context.AmfRan,
+func handleInitialUEMessageMain(ctx stdctx.Context, ran *context.AmfRan,
 	message *ngapType.NGAPPDU,
 	rANUENGAPID *ngapType.RANUENGAPID,
 	nASPDU *ngapType.NASPDU,
@@ -465,39 +465,37 @@ func handleInitialUEMessageMain(ran *context.AmfRan,
 		}
 	}
 
-	var err error
-	// Pass ran.Ctx (containing per-message span) to NewRanUe
-	// so trace context propagates to NAS handlers and HTTP client calls
-	ranUe, err = ran.NewRanUeWithContext(ran.Ctx, rANUENGAPID.Value)
+	// Create a per-UE / per-procedure root span as independent trace
+	// Each UE Registration Flow is a separate trace root for better isolation
+	rootTracer := otel.Tracer("amf-procedure")
+	rootCtx, rootSpan := rootTracer.Start(stdctx.Background(), "UE Registration Flow")
+	defer rootSpan.End()
+
+	rootSpan.SetAttributes(
+		attribute.String("ran.id", fmt.Sprintf("%+v", ran.RanId)),
+		attribute.Int64("ranUeNgapId", rANUENGAPID.Value),
+	)
+
+	// Pass rootCtx to NewRanUe so each UE gets its own trace
+	ranUe, err := ran.NewRanUeWithContext(rootCtx, rANUENGAPID.Value)
 	if err != nil {
 		ran.Log.Errorf("NewRanUe Error: %+v", err)
+		return
 	}
 
-	//add
-	if ranUe.TraceContext == nil {
-		rootTracer := otel.Tracer("amf-root")
-		rootCtx, rootSpan := rootTracer.Start(stdctx.Background(), "UE Registration Flow")
-		rootSpan.SetAttributes(
-			attribute.String("n2.ranId", fmt.Sprintf("%+v", ran.RanId)),
-		)
-		rootSpan.End()
-		ranUe.TraceContext = rootCtx
-	}
+	ranUe.TraceContext = rootCtx
 
 	tracer := otel.Tracer("amf-n2")
-	ctx := ranUe.TraceContext
-	if ctx == nil {
-		ctx = stdctx.Background()
-	}
-	ctx, span := tracer.Start(ctx, "N2 InitialUEMessage")
+	ctx, span := tracer.Start(rootCtx, "N2 InitialUEMessage")
 	defer span.End()
+
 	span.SetAttributes(
 		attribute.String("ran.id", fmt.Sprintf("%+v", ran.RanId)),
 	)
 	ranUe.TraceContext = ctx
 
 	spanCtx := span.SpanContext()
-	ran.Log.Infof("N2 span traceID=%s", spanCtx.TraceID().String())
+	ran.Log.Infof("UE root traceID=%s ranUeNgapId=%d", spanCtx.TraceID().String(), rANUENGAPID.Value)
 
 	ran.Log.Debugf("New RanUe [RanUeNgapID: %d]", ranUe.RanUeNgapId)
 
