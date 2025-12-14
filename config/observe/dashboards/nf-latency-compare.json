@@ -9,91 +9,241 @@
   "refresh": "10s",
   "panels": [
     {
-      "type": "timeseries",
-      "title": "Prometheus: p95 / p99 request latency",
-      "id": 1,
-      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 10 },
-      "datasource": "Prometheus",
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "options": {},
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(${metric}_bucket{nf_type=~\"${nf:regex}\"}[5m])) by (le, nf_type))",
-          "format": "time_series",
-          "legendFormat": "p95",
-          "refId": "A"
-        },
-        {
-          "expr": "histogram_quantile(0.99, sum(rate(${metric}_bucket{nf_type=~\"${nf:regex}\"}[5m])) by (le, nf_type))",
-          "format": "time_series",
-          "legendFormat": "p99",
-          "refId": "B"
-        }
-      ],
-      "description": "Shows Prometheus-derived p95/p99 from the selected histogram metric (choose `Histogram Metric` variable). The dashboard queries `${metric}_bucket` (Prometheus histogram buckets). Choose an NF and metric that match your exported metrics."
+      "type": "row",
+      "title": "📊 Load & Latency Overview",
+      "id": 100,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
     },
     {
       "type": "timeseries",
-      "title": "Per-NF p95 (compare multiple NFs)",
-      "id": 2,
-      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 8 },
+      "title": "Request Rate (req/s) - Shows UE Registration Load",
+      "id": 10,
+      "gridPos": { "x": 0, "y": 1, "w": 8, "h": 6 },
       "datasource": "Prometheus",
-      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(${metric}_bucket{nf_type=~\"${nf:regex}\"}[5m])) by (le, nf_type))",
+          "expr": "sum(rate(${metric}_count{nf_type=~\"${nf:regex}\"}[1m])) by (nf_type)",
           "format": "time_series",
           "legendFormat": "{{nf_type}}",
-          "refId": "C"
+          "refId": "A"
         }
       ],
-      "description": "Quick comparison p95 across AMF/AUSF/UDM/UDR/NSSF/NRF/SMF/UPF. Tweak job label to match your Prometheus target labels."
+      "description": "Request rate per NF. High spikes indicate multiple concurrent UE registrations."
     },
     {
-      "type": "table",
-      "title": "Top SBI APIs by p95 (example)",
-      "id": 3,
-      "gridPos": { "x": 0, "y": 18, "w": 24, "h": 8 },
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "topk(10, histogram_quantile(0.95, sum(rate(${metric}_bucket{nf_type=~\"${nf:regex}\"}[5m])) by (le, api)))",
-          "format": "table",
-          "instant": false,
-          "legendFormat": "{{api}}",
-          "refId": "D"
-        }
-      ],
-      "options": { "showHeader": true },
-      "description": "Example table showing top APIs by p95 derived from histogram buckets. Replace label `api` with the label your metrics export (for example `handler` or `endpoint`)."
-    },
-    {
-      "type": "text",
-      "title": "Tempo per-span latency — quick links & example query",
-      "id": 4,
-      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 6 },
-      "options": {
-        "content": "### Per-span latency (Tempo)\n\nUse Grafana Explore (Traces) to inspect per-span latencies by service and operation. Example trace query: <code>{resource.service.name=\\\"amf\\\"}</code>.\n\nCommon NF service names: amf, ausf, udm, udr, nssf, nrf, smf, pcf\n\nNotes:\n- Tempo shows exact span durations and parent-child relationships.\n- Use the Prometheus panels above to spot the slow NF, then click through traces in Explore to find slow spans / SBI APIs.\n- TraceQL syntax: {resource.service.name=\\\"nf_name\\\"} duration > 100ms",
-        "mode": "markdown"
-      },
-      "transparent": false
-    },
-    {
-      "type": "table",
-      "title": "Tempo: Recent Traces",
-      "id": 5,
-      "gridPos": { "x": 0, "y": 32, "w": 24, "h": 14 },
+      "type": "stat",
+      "title": "Current Trace Rate",
+      "id": 11,
+      "refresh": "30s",
+      "cacheTimeout": "60s",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 6 },
       "datasource": "Tempo",
       "targets": [
         {
           "queryType": "traceql",
-          "query": "{resource.service.name=~\"${nf:regex}\"}",
-          "limit": 50,
+          "query": "{ resource.service.name=~\"${nf:regex}\" }",
+          "limit": 100,
           "refId": "A"
         }
       ],
       "options": {
-        "showHeader": true
+        "graphMode": "area",
+        "colorMode": "value",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "green" },
+              { "value": 50, "color": "yellow" },
+              { "value": 100, "color": "red" }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": ["count"]
+          }
+        }
+      ],
+      "description": "Number of traces in current time window. Each trace ≈ one UE registration flow."
+    },
+    {
+      "type": "timeseries",
+      "title": "SBI Latency p95/p99 by NF",
+      "id": 1,
+      "gridPos": { "x": 12, "y": 1, "w": 12, "h": 6 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "max"]
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(${metric}_bucket{nf_type=~\"${nf:regex}\"}[1m])) by (le, nf_type))",
+          "format": "time_series",
+          "legendFormat": "p95 {{nf_type}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(${metric}_bucket{nf_type=~\"${nf:regex}\"}[1m])) by (le, nf_type))",
+          "format": "time_series",
+          "legendFormat": "p99 {{nf_type}}",
+          "refId": "B"
+        }
+      ],
+      "description": "P95/P99 latency by NF. Compare with left panel: when request rate spikes (multiple UEs), does latency increase?"
+    },
+    {
+      "type": "row",
+      "title": "📈 Latency vs Load Correlation Analysis",
+      "id": 101,
+      "gridPos": { "x": 0, "y": 7, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency vs Request Rate Overlay (KEY PANEL for Multi-UE Analysis)",
+      "id": 12,
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 9 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 0,
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*rate.*" },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "reqps"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 30
+              },
+              {
+                "id": "color",
+                "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*p95.*" },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "color",
+                "value": { "mode": "palette-classic" }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "max", "last"]
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(${metric}_bucket{nf_type=~\"${nf:regex}\"}[1m])) by (le, nf_type))",
+          "format": "time_series",
+          "legendFormat": "p95 {{nf_type}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(${metric}_count{nf_type=~\"${nf:regex}\"}[1m])) by (nf_type)",
+          "format": "time_series",
+          "legendFormat": "rate {{nf_type}}",
+          "refId": "B"
+        }
+      ],
+      "description": "KEY PANEL: Shows p95 latency (left axis, colored lines) overlaid with request rate (right axis, blue filled). When rate spikes due to multiple UE registrations, check if latency also increases - this indicates load-sensitive behavior."
+    },
+    {
+      "type": "table",
+      "title": "Trace Overview by Service",
+      "id": 6,
+      "refresh": "30s",
+      "cacheTimeout": "60s",
+      "gridPos": { "x": 0, "y": 17, "w": 8, "h": 9 },
+      "datasource": "Tempo",
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{ resource.service.name=~\"${nf:regex}\" }",
+          "limit": 30,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Duration",
+            "desc": true
+          }
+        ]
       },
       "transformations": [
         {
@@ -103,14 +253,282 @@
             "indexByName": {},
             "renameByName": {
               "traceID": "Trace ID",
-              "traceName": "Name",
+              "traceName": "Operation",
+              "rootServiceName": "Root Service",
               "startTime": "Start Time",
               "duration": "Duration"
             }
           }
         }
       ],
-      "description": "Recent traces from Tempo. Click trace ID to view details in Explore."
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Duration" },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "gradient-gauge"
+              },
+              {
+                "id": "max",
+                "value": 500
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Root Service" },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "value": "amf", "text": "AMF", "color": "blue" },
+                  { "type": "value", "value": "ausf", "text": "AUSF", "color": "green" },
+                  { "type": "value", "value": "udm", "text": "UDM", "color": "purple" },
+                  { "type": "value", "value": "udr", "text": "UDR", "color": "orange" },
+                  { "type": "value", "value": "nrf", "text": "NRF", "color": "yellow" },
+                  { "type": "value", "value": "nssf", "text": "NSSF", "color": "red" }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Traces grouped by root service, showing operation names and durations. Duration displayed with gradient gauge for quick visual comparison."
+    },
+    {
+      "type": "timeseries",
+      "title": "Per-NF p95 Comparison",
+      "id": 2,
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 7 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(${metric}_bucket{nf_type=~\"${nf:regex}\"}[5m])) by (le, nf_type))",
+          "format": "time_series",
+          "legendFormat": "{{nf_type}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Quick comparison of p95 latency across multiple NFs"
+    },
+    {
+      "type": "table",
+      "title": "Recent Traces Timeline",
+      "id": 5,
+      "refresh": "30s",
+      "cacheTimeout": "60s",
+      "gridPos": { "x": 8, "y": 17, "w": 8, "h": 9 },
+      "datasource": "Tempo",
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{ resource.service.name=~\"${nf:regex}\" }",
+          "limit": 50,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Start Time",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false,
+          "reducer": ["sum"],
+          "fields": ""
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "traceID": "Trace ID",
+              "traceName": "Trace Name",
+              "startTime": "Start Time",
+              "duration": "Duration"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Duration" },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Trace ID" },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View in Explore",
+                    "url": "/explore?traceId=${__value.raw}&datasource=Tempo"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Recent traces sorted by time - each trace typically represents one UE registration. Click Trace ID to view detailed span tree in Explore."
+    },
+    {
+      "type": "histogram",
+      "title": "SBI Latency Distribution (Histogram)",
+      "id": 3,
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 7 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(${metric}_bucket{nf_type=~\"${nf:regex}\"}[5m])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}",
+          "refId": "A"
+        }
+      ],
+      "description": "SBI latency distribution histogram (all selected NFs)"
+    },
+    {
+      "type": "table",
+      "title": "Top Slowest Traces",
+      "id": 7,
+      "refresh": "30s",
+      "cacheTimeout": "60s",
+      "gridPos": { "x": 16, "y": 17, "w": 8, "h": 9 },
+      "datasource": "Tempo",
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{ duration > 50ms }",
+          "limit": 50,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Duration",
+            "desc": true
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "traceID": "Trace ID",
+              "traceName": "Trace Name",
+              "startTime": "Start Time",
+              "duration": "Duration"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "green" },
+              { "value": 100, "color": "yellow" },
+              { "value": 200, "color": "red" }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Duration" },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Traces with duration > 50ms, sorted by slowest first. Helps identify performance issues in UE registration flows."
+    },
+    {
+      "type": "text",
+      "title": "📖 How to Observe Multi-UE Registration Impact",
+      "id": 4,
+      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 6 },
+      "options": {
+        "content": "### How to Compare Single vs Multiple UE Registration Latency\n\n**Step 1: Baseline (Single UE)**\n1. Start with only 1 UE registration\n2. Observe \"Request Rate\" panel - should show low, steady rate (e.g., < 5 req/s per NF)\n3. Note the p95/p99 latency values in \"SBI Latency p95/p99\" panel\n4. Check \"Recent Traces\" - should see individual traces with low duration\n\n**Step 2: Load Test (Multiple UEs)**\n1. Trigger multiple UE registrations simultaneously (e.g., restart 5-10 UEs)\n2. Watch \"Request Rate\" spike (e.g., > 20 req/s)\n3. Observe if p95/p99 latency increases in correlation\n\n**Step 3: Analyze Impact**\n- **Key Panel**: \"Latency vs Request Rate Overlay\" - shows both metrics together\n  - If latency curve follows rate curve → system is load-sensitive\n  - If latency stays flat → good scalability\n- Check \"Top Slowest Traces\" to find which specific registration flows were affected\n- Use \"Per-NF p95 Comparison\" to identify which NF becomes bottleneck under load\n\n**Expected Behavior**:\n- **Good**: Latency increases slightly (< 2x) during load spikes\n- **Concerning**: Latency increases significantly (> 5x) or stays high after load drops\n\n**TraceQL Query Examples**:\n- All traces: `{}`\n- Slow traces: `{ duration > 100ms }`\n- Specific NF: `{resource.service.name=\"amf\"}`",
+        "mode": "markdown"
+      },
+      "transparent": false
     }
   ],
   "templating": {
