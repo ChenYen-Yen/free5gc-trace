@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"runtime/debug"
@@ -21,6 +22,14 @@ import (
 	"github.com/free5gc/smf/pkg/factory"
 	"github.com/free5gc/util/metrics"
 	"github.com/free5gc/util/metrics/utils"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
 type SmfAppInterface interface {
@@ -193,9 +202,25 @@ func (a *SmfApp) SetReportCaller(reportCaller bool) {
 }
 
 func (a *SmfApp) Start() {
+	ctx := a.ctx
+
+	logger.MainLog.Infoln("Initializing OpenTelemetry tracer...")
+	tp, err := initTracerProvider(ctx, "smf")
+	if err != nil {
+		logger.MainLog.Warnf("Failed to init tracer provider: %+v", err)
+		tp = nil
+	} else {
+		logger.MainLog.Infoln("OpenTelemetry tracer initialized successfully")
+		defer func() {
+			if err := tp.Shutdown(context.Background()); err != nil {
+				logger.MainLog.Warnf("Error shutting down tracer provider: %+v", err)
+			}
+		}()
+	}
+
 	logger.InitLog.Infoln("Server started")
 
-	err := a.sbiServer.Run(context.Background(), &a.wg)
+	err = a.sbiServer.Run(context.Background(), &a.wg)
 	if err != nil {
 		logger.MainLog.Errorf("sbi server run error %+v", err)
 	}
@@ -265,4 +290,50 @@ func (a *SmfApp) terminateProcedure() {
 func (a *SmfApp) WaitRoutineStopped() {
 	a.wg.Wait()
 	logger.MainLog.Infof("SMF App is terminated")
+}
+
+func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.TracerProvider, error) {
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		return nil, fmt.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT not set")
+	}
+
+	// HTTP OTLP client，endpoint 例如 "tempo:4318"
+	client := otlptracehttp.NewClient(
+		otlptracehttp.WithEndpoint(endpoint),
+		otlptracehttp.WithInsecure(),
+	)
+
+	exporter, err := otlptrace.New(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := resource.New(
+		ctx,
+		resource.WithFromEnv(),
+		resource.WithTelemetrySDK(),
+		resource.WithHost(),
+		resource.WithAttributes(
+			semconv.ServiceName(serviceName),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		),
+	)
+
+	return tp, nil
 }
