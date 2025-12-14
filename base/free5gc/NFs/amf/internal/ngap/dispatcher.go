@@ -1,6 +1,7 @@
 package ngap
 
 import (
+	stdctx "context"
 	"net"
 
 	"github.com/free5gc/amf/internal/context"
@@ -10,6 +11,10 @@ import (
 )
 
 func Dispatch(conn net.Conn, msg []byte) {
+	DispatchWithContext(stdctx.Background(), conn, msg)
+}
+
+func DispatchWithContext(ctx stdctx.Context, conn net.Conn, msg []byte) {
 	var ran *context.AmfRan
 	amfSelf := context.GetSelf()
 
@@ -21,7 +26,21 @@ func Dispatch(conn net.Conn, msg []byte) {
 			return
 		}
 		logger.NgapLog.Infof("Create a new NG connection for: %s", addr.String())
-		ran = amfSelf.NewAmfRan(conn)
+		ran = amfSelf.NewAmfRanWithContext(ctx, conn)
+	}
+
+	// Rebind ran.Log with the current context so per-message spans (or connection span)
+	// are reflected in subsequent ran.Log.* calls. This keeps changes minimal and
+	// ensures logs include trace_id/span_id when present on ctx.
+	if ran != nil {
+		addr := ran.Conn.RemoteAddr()
+		addrStr := "(nil)"
+		if addr != nil {
+			addrStr = addr.String()
+		}
+		baseLog := logger.NgapLog.WithField(logger.FieldRanAddr, addrStr)
+		// attach current ctx's trace/span to ran.Log
+		ran.Log = logger.WithTraceContext(ctx, baseLog)
 	}
 
 	if len(msg) == 0 {

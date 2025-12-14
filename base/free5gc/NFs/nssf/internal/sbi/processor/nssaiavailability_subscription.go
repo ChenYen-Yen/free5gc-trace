@@ -50,6 +50,8 @@ func (p *Processor) NssaiAvailabilitySubscriptionCreate(
 	c *gin.Context,
 	createData models.NssfEventSubscriptionCreateData,
 ) {
+	traceLog := logger.WithTraceContext(c.Request.Context(), logger.NssaiavailLog)
+
 	var (
 		response       = &models.NssfEventSubscriptionCreatedData{}
 		problemDetails *models.ProblemDetails
@@ -58,7 +60,7 @@ func (p *Processor) NssaiAvailabilitySubscriptionCreate(
 	var subscription factory.Subscription
 	tempID, err := getUnusedSubscriptionID()
 	if err != nil {
-		logger.NssaiavailLog.Warn(err)
+		traceLog.Warn(err)
 
 		problemDetails = &models.ProblemDetails{
 			Title:  util.UNSUPPORTED_RESOURCE,

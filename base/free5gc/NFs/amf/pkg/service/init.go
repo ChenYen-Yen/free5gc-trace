@@ -215,9 +215,10 @@ func (a *AmfApp) Start() {
 	amf_context.InitAmfContext(self)
 
 	ngapHandler := ngap_service.NGAPHandler{
-		HandleMessage:         ngap.Dispatch,
-		HandleNotification:    ngap.HandleSCTPNotification,
-		HandleConnectionError: ngap.HandleSCTPConnError,
+		HandleMessage:            ngap.Dispatch,
+		HandleMessageWithContext: ngap.DispatchWithContext,
+		HandleNotification:       ngap.HandleSCTPNotification,
+		HandleConnectionError:    ngap.HandleSCTPConnError,
 	}
 
 	sctpConfig := ngap_service.NewSctpConfig(factory.AmfConfig.GetSctpConfig())

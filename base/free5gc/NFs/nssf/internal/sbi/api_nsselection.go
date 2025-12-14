@@ -33,7 +33,9 @@ func (s *Server) getNsSelectionRoutes() []Route {
 }
 
 func (s *Server) NetworkSliceInformationGet(c *gin.Context) {
-	logger.NsselLog.Infof("Handle NSSelectionGet")
+	ctx := c.Request.Context()
+	traceLog := logger.WithTraceContext(ctx, logger.NsselLog)
+	traceLog.Infof("Handle NSSelectionGet")
 
 	var query processor.NetworkSliceInformationGetQuery
 	if err := c.ShouldBindQuery(&query); err != nil {

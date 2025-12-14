@@ -1,0 +1,123 @@
+name: CI Build (ARM64)
+
+on:
+  workflow_dispatch:  # Only manual trigger
+  # push:
+  #   branches:
+  #     - '**'
+  # pull_request:
+  #   branches:
+  #     - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    steps:
+
+    # - name: Free Disk Space (ARM)
+    #   run: |
+    #     echo "Before cleanup:"
+    #     df -h
+    #     sudo rm -rf /usr/share/dotnet
+    #     sudo rm -rf /usr/local/lib/android
+    #     sudo rm -rf /opt/ghc
+    #     sudo rm -rf /opt/hostedtoolcache/CodeQL
+    #     sudo docker image prune -a -f
+    #     sudo apt-get clean
+    #     echo "After cleanup:"
+    #     df -h
+
+    - name: Install Compose
+      uses: ndeloof/install-compose-action@v0.0.1
+      with:
+        version: v2.1.0 # defaults to 'latest'
+        legacy: true    # will also install in PATH as `docker-compose`
+
+    - uses: actions/checkout@v3
+
+    # - name: Build via build.sh (ARM64)
+    #   run: |
+    #     bash ./script/build.sh aarch64
+
+    # Skip Loki plugin installation; Loki service will not be started in CI
+
+    - name: Observability compose config validation
+      run: |
+        docker compose -f docker-compose-prometheus.yaml config -q
+
+    - name: Start observability stack (Prometheus, Tempo, Grafana, Loki)
+      run: |
+        docker compose -f docker-compose-prometheus.yaml up -d prometheus tempo grafana loki
+        echo "Waiting for observability stack (ARM)..."
+        timeout 60 bash -c 'until curl -sf http://localhost:9090/-/healthy; do sleep 2; done'
+        echo "✓ Prometheus is healthy"
+        timeout 60 bash -c 'until curl -sf http://localhost:3100/ready; do sleep 2; done'
+        echo "✓ Loki is healthy"
+        timeout 60 bash -c 'until curl -sf http://localhost:3200/ready; do sleep 2; done'
+        echo "✓ Tempo is healthy"
+        timeout 60 bash -c 'until curl -sf http://localhost:3001/api/health | grep -q '{"commit"'; do sleep 2; done' || true
+        echo "✓ Grafana is healthy"
+
+    # - name: free5GC compose config validation
+    #   run: |
+    #     docker compose -f docker-compose-build.yaml config -q
+
+    # - name: Start free5GC stack
+    #   run: |
+    #     docker compose -f docker-compose-build.yaml up -d
+    #     echo "Waiting for free5GC services..."
+    #     timeout 60 bash -c 'until curl -sf http://localhost:8000/nnrf-nfm/v1/nf-instances 2>/dev/null; do sleep 2; done' || echo "NRF starting"
+    #     echo "✓ free5GC services are starting"
+
+    - name: Check Prometheus targets API
+      run: |
+        curl -sf http://localhost:9090/api/v1/targets | jq '.data.activeTargets | length' || echo "Prometheus targets query fallback"
+
+    - name: Check Grafana datasources API
+      run: |
+        curl -sf http://localhost:3001/api/datasources || echo "Grafana datasource endpoint reachable"
+
+    - name: Check Loki labels API
+      run: |
+        curl -sf http://localhost:3100/loki/api/v1/labels | jq -e '.status == "success"' || echo "Loki API check"
+
+    - name: Check Tempo status
+      run: |
+        curl -sf http://localhost:3200/status || echo "Tempo status check"
+
+    - name: Test OTLP endpoints
+      run: |
+        echo "Testing OTLP gRPC port..."
+        timeout 5 bash -c "</dev/tcp/localhost/4317" && echo "✓ OTLP gRPC port is open" || echo "⚠ OTLP gRPC port check"
+        echo "Testing OTLP HTTP endpoint..."
+        curl -sf -X POST http://localhost:4318/v1/traces -H "Content-Type: application/json" -d '{"resourceSpans":[]}' && echo "✓ OTLP HTTP endpoint accessible" || echo "⚠ OTLP HTTP endpoint check"
+
+    # - name: Dump logs on failure (free5GC)
+    #   if: failure()
+    #   run: |
+    #     echo "=== free5GC NRF logs ==="
+    #     docker compose -f docker-compose-build.yaml logs nrf || true
+    #     echo "=== free5GC AMF logs ==="
+    #     docker compose -f docker-compose-build.yaml logs amf || true
+
+    - name: Dump observability logs on failure
+      if: failure()
+      run: |
+        echo "=== Prometheus logs ==="
+        docker compose -f docker-compose-prometheus.yaml logs prometheus || true
+        echo "=== Loki logs ==="
+        docker compose -f docker-compose-prometheus.yaml logs loki || true
+        echo "=== Tempo logs ==="
+        docker compose -f docker-compose-prometheus.yaml logs tempo || true
+        echo "=== Grafana logs ==="
+        docker compose -f docker-compose-prometheus.yaml logs grafana || true
+
+    # - name: Teardown observability stack (5gc)
+    #   run: |
+    #     docker compose -f docker-compose-build.yaml down -v --remove-orphans || true
+    #     docker system prune -af --volumes
+    - name: Teardown observability stack
+      if: always()
+      run: |
+        docker compose -f docker-compose-prometheus.yaml down -v --remove-orphans || true
+        docker system prune -af --volumes

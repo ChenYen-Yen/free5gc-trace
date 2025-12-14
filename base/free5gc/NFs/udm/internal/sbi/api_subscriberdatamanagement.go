@@ -35,7 +35,9 @@ func (s *Server) HandleGetAmData(c *gin.Context) {
 	query.Set("plmn-id", c.Query("plmn-id"))
 	query.Set("supported-features", c.Query("supported-features"))
 
-	logger.SdmLog.Infof("Handle GetAmData")
+	ctx := c.Request.Context()
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle GetAmData")
 
 	supi := c.Params.ByName("supi")
 
@@ -49,7 +51,6 @@ func (s *Server) HandleGetAmData(c *gin.Context) {
 	supportedFeatures := query.Get("supported-features")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -99,7 +100,10 @@ func (s *Server) HandleGetSmfSelectData(c *gin.Context) {
 	query.Set("plmn-id", c.Query("plmn-id"))
 	query.Set("supported-features", c.Query("supported-features"))
 
-	logger.SdmLog.Infof("Handle GetSmfSelectData")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle GetSmfSelectData")
 
 	supi := c.Params.ByName("supi")
 	plmnIDStruct, problemDetails := s.getPlmnIDStruct(query)
@@ -112,7 +116,6 @@ func (s *Server) HandleGetSmfSelectData(c *gin.Context) {
 	supportedFeatures := query.Get("supported-features")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -142,7 +145,10 @@ func (s *Server) HandleGetSupi(c *gin.Context) {
 	query.Set("dataset-names", c.Query("dataset-names"))
 	query.Set("supported-features", c.Query("supported-features"))
 
-	logger.SdmLog.Infof("Handle GetSupiRequest")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle GetSupiRequest")
 
 	supi := c.Params.ByName("supi")
 	plmnIDStruct, problemDetails := s.getPlmnIDStruct(query)
@@ -156,7 +162,6 @@ func (s *Server) HandleGetSupi(c *gin.Context) {
 	supportedFeatures := query.Get("supported-features")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -172,7 +177,10 @@ func (s *Server) HandleGetSupi(c *gin.Context) {
 
 // GetSharedData - retrieve shared data
 func (s *Server) HandleGetSharedData(c *gin.Context) {
-	logger.SdmLog.Infof("Handle GetSharedData")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle GetSharedData")
 
 	sharedDataIds := c.QueryArray("shared-data-ids")
 	supportedFeatures := c.QueryArray("supported-features")
@@ -183,7 +191,6 @@ func (s *Server) HandleGetSharedData(c *gin.Context) {
 	}
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -227,10 +234,12 @@ func (s *Server) HandleSubscribeToSharedData(c *gin.Context) {
 		return
 	}
 
-	logger.SdmLog.Infof("Handle SubscribeToSharedData")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle SubscribeToSharedData")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -272,12 +281,14 @@ func (s *Server) HandleSubscribe(c *gin.Context) {
 		return
 	}
 
-	logger.SdmLog.Infof("Handle Subscribe")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle Subscribe")
 
 	supi := c.Params.ByName("supi")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -290,13 +301,15 @@ func (s *Server) HandleSubscribe(c *gin.Context) {
 
 // Unsubscribe - unsubscribe from notifications
 func (s *Server) HandleUnsubscribe(c *gin.Context) {
-	logger.SdmLog.Infof("Handle Unsubscribe")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle Unsubscribe")
 
 	supi := c.Params.ByName("ueId")
 	subscriptionID := c.Params.ByName("subscriptionId")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -310,12 +323,14 @@ func (s *Server) HandleUnsubscribe(c *gin.Context) {
 
 // UnsubscribeForSharedData - unsubscribe from notifications for shared data
 func (s *Server) HandleUnsubscribeForSharedData(c *gin.Context) {
-	logger.SdmLog.Infof("Handle UnsubscribeForSharedData")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle UnsubscribeForSharedData")
 
 	subscriptionID := c.Params.ByName("subscriptionId")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -357,13 +372,15 @@ func (s *Server) HandleModify(c *gin.Context) {
 		return
 	}
 
-	logger.SdmLog.Infof("Handle Modify")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle Modify")
 
 	supi := c.Params.ByName("ueId")
 	subscriptionID := c.Params.ByName("subscriptionId")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -406,13 +423,15 @@ func (s *Server) HandleModifyForSharedData(c *gin.Context) {
 		return
 	}
 
-	logger.SdmLog.Infof("Handle ModifyForSharedData")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle ModifyForSharedData")
 
 	supi := c.Params.ByName("supi")
 	subscriptionID := c.Params.ByName("subscriptionId")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -426,13 +445,15 @@ func (s *Server) HandleModifyForSharedData(c *gin.Context) {
 
 // GetTraceData - retrieve a UE's Trace Configuration Data
 func (s *Server) HandleGetTraceData(c *gin.Context) {
-	logger.SdmLog.Infof("Handle GetTraceData")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle GetTraceData")
 
 	supi := c.Params.ByName("supi")
 	plmnID := c.Query("plmn-id")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -446,13 +467,15 @@ func (s *Server) HandleGetTraceData(c *gin.Context) {
 
 // GetUeContextInSmfData - retrieve a UE's UE Context In SMF Data
 func (s *Server) HandleGetUeContextInSmfData(c *gin.Context) {
-	logger.SdmLog.Infof("Handle GetUeContextInSmfData")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle GetUeContextInSmfData")
 
 	supi := c.Params.ByName("supi")
 	supportedFeatures := c.Query("supported-features")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -475,7 +498,10 @@ func (s *Server) HandleGetNssai(c *gin.Context) {
 	query.Set("plmn-id", c.Query("plmn-id"))
 	query.Set("supported-features", c.Query("supported-features"))
 
-	logger.SdmLog.Infof("Handle GetNssai")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle GetNssai")
 
 	supi := c.Params.ByName("supi")
 	plmnIDStruct, problemDetails := s.getPlmnIDStruct(query)
@@ -488,7 +514,6 @@ func (s *Server) HandleGetNssai(c *gin.Context) {
 	supportedFeatures := query.Get("supported-features")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -509,7 +534,10 @@ func (s *Server) HandleGetSmData(c *gin.Context) {
 	query.Set("single-nssai", c.Query("single-nssai"))
 	query.Set("supported-features", c.Query("supported-features"))
 
-	logger.SdmLog.Infof("Handle GetSmData")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle GetSmData")
 
 	supi := c.Params.ByName("supi")
 	plmnIDStruct, problemDetails := s.getPlmnIDStruct(query)
@@ -524,7 +552,6 @@ func (s *Server) HandleGetSmData(c *gin.Context) {
 	supportedFeatures := query.Get("supported-features")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),
@@ -543,12 +570,14 @@ func (s *Server) HandleGetSmData(c *gin.Context) {
 func (s *Server) HandleGetIdTranslationResult(c *gin.Context) {
 	// req.Query.Set("SupportedFeatures", c.Query("supported-features"))
 
-	logger.SdmLog.Infof("Handle GetIdTranslationResultRequest")
+	ctx := c.Request.Context()
+
+	traceLog := logger.WithTraceContext(ctx, logger.SdmLog)
+	traceLog.Infof("Handle GetIdTranslationResultRequest")
 
 	gpsi := c.Params.ByName("ueId")
 
 	//add
-	ctx := c.Request.Context()
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("nf", "udm"),

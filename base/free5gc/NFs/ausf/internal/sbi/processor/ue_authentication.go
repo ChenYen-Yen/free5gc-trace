@@ -274,10 +274,13 @@ func (p *Processor) HandleUeAuthPostRequest(c *gin.Context, authenticationInfo m
 
 	c.Request = c.Request.WithContext(ctx)
 
-	spanCtx := trace.SpanContextFromContext(c.Request.Context())
-	logger.UeAuthLog.Infof("AUSF incoming traceID: %s", spanCtx.TraceID().String())
+	// Bind trace context to logger
+	traceLog := logger.WithTraceContext(ctx, logger.UeAuthLog)
 
-	logger.UeAuthLog.Infof("HandleUeAuthPostRequest")
+	spanCtx := trace.SpanContextFromContext(c.Request.Context())
+	traceLog.Infof("AUSF incoming traceID: %s", spanCtx.TraceID().String())
+
+	traceLog.Infof("HandleUeAuthPostRequest")
 	p.UeAuthPostRequestProcedure(c, authenticationInfo)
 }
 
@@ -295,8 +298,11 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 
 	c.Request = c.Request.WithContext(ctx)
 
+	// Bind trace context to logger
+	traceLog := logger.WithTraceContext(ctx, logger.UeAuthLog)
+
 	spanCtx := trace.SpanContextFromContext(c.Request.Context())
-	logger.UeAuthLog.Infof("AUSF incoming traceID: %s", spanCtx.TraceID().String())
+	traceLog.Infof("AUSF incoming traceID: %s", spanCtx.TraceID().String())
 
 	var responseBody models.UeAuthenticationCtx
 	var authInfoReq models.AuthenticationInfoRequest
@@ -310,12 +316,12 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 			Cause:  "SERVING_NETWORK_NOT_AUTHORIZED",
 			Status: http.StatusForbidden,
 		}
-		logger.UeAuthLog.Infoln("403 forbidden: serving network NOT AUTHORIZED")
+		traceLog.Infoln("403 forbidden: serving network NOT AUTHORIZED")
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(http.StatusForbidden, problemDetails)
 		return
 	}
-	logger.UeAuthLog.Infoln("Serving network authorized")
+	traceLog.Infoln("Serving network authorized")
 
 	responseBody.ServingNetworkName = snName
 	authInfoReq.ServingNetworkName = snName
@@ -361,14 +367,14 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 
 	ausf_context.AddAusfUeContextToPool(ausfUeContext)
 
-	logger.UeAuthLog.Infof("Add SuciSupiPair (%s, %s) to map.\n", supiOrSuci, ueid)
+	traceLog.Infof("Add SuciSupiPair (%s, %s) to map.\n", supiOrSuci, ueid)
 	ausf_context.AddSuciSupiPairToMap(supiOrSuci, ueid)
 
 	locationURI := self.Url + factory.AusfAuthResUriPrefix + "/ue-authentications/" + supiOrSuci
 	putLink := locationURI
 	switch authInfoResult.AuthType {
 	case models.UdmUeauAuthType__5_G_AKA:
-		logger.UeAuthLog.Infoln("Use 5G AKA auth method")
+		traceLog.Infoln("Use 5G AKA auth method")
 		putLink += "/5g-aka-confirmation"
 
 		// Derive HXRES* from XRES*
@@ -390,7 +396,7 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 		}
 		hxresStarAll := sha256.Sum256(hxresStarBytes)
 		hxresStar := hex.EncodeToString(hxresStarAll[16:]) // last 128 bits
-		logger.Auth5gAkaLog.Infof("XresStar = %x\n", authInfoResult.AuthenticationVector.XresStar)
+		logger.WithTraceContext(ctx, logger.Auth5gAkaLog).Infof("XresStar = %x\n", authInfoResult.AuthenticationVector.XresStar)
 
 		// Derive Kseaf from Kausf
 		Kausf := authInfoResult.AuthenticationVector.Kausf
@@ -545,7 +551,8 @@ func (p *Processor) HandleAuth5gAkaComfirmRequest(
 	confirmationData models.ConfirmationData,
 	confirmationDataResponseId string,
 ) {
-	logger.Auth5gAkaLog.Infof("Auth5gAkaComfirmRequest")
+	traceLog := logger.WithTraceContext(c.Request.Context(), logger.Auth5gAkaLog)
+	traceLog.Infof("Auth5gAkaComfirmRequest")
 	p.Auth5gAkaComfirmRequestProcedure(c, confirmationData, confirmationDataResponseId)
 }
 
@@ -600,13 +607,16 @@ func (p *Processor) Auth5gAkaComfirmRequestProcedure(c *gin.Context, updateConfi
 	c.Request = c.Request.WithContext(ctx)
 	ausfCurrentContext.TraceContext = ctx
 
+	// Bind trace context to logger
+	traceLog := logger.WithTraceContext(ctx, logger.Auth5gAkaLog)
+
 	// Compare the received RES* with the stored XRES*
-	logger.Auth5gAkaLog.Infof("res*: %x\nXres*: %x\n", updateConfirmationData.ResStar, ausfCurrentContext.XresStar)
+	traceLog.Infof("res*: %x\nXres*: %x\n", updateConfirmationData.ResStar, ausfCurrentContext.XresStar)
 	if strings.EqualFold(updateConfirmationData.ResStar, ausfCurrentContext.XresStar) {
 		ausfCurrentContext.AuthStatus = models.AusfUeAuthenticationAuthResult_SUCCESS
 		confirmDataRsp.AuthResult = models.AusfUeAuthenticationAuthResult_SUCCESS
 		success = true
-		logger.Auth5gAkaLog.Infoln("5G AKA confirmation succeeded")
+		traceLog.Infoln("5G AKA confirmation succeeded")
 		confirmDataRsp.Supi = currentSupi
 		confirmDataRsp.Kseaf = ausfCurrentContext.Kseaf
 	} else {

@@ -391,6 +391,12 @@ func (ue *AmfUe) UpdateLogFields(accessType models.AccessType) {
 	ue.NASLog = ue.NASLog.WithField(logger.FieldSupi, fmt.Sprintf("SUPI:%s", ue.Supi))
 	ue.GmmLog = ue.GmmLog.WithField(logger.FieldSupi, fmt.Sprintf("SUPI:%s", ue.Supi))
 	ue.ProducerLog = ue.ProducerLog.WithField(logger.FieldSupi, fmt.Sprintf("SUPI:%s", ue.Supi))
+
+	// Rebind trace context if available
+	if ue.TraceContext != nil {
+		ue.NASLog = logger.WithTraceContext(ue.TraceContext, ue.NASLog)
+		ue.GmmLog = logger.WithTraceContext(ue.TraceContext, ue.GmmLog)
+	}
 }
 
 func (ue *AmfUe) GetAnType() models.AccessType {

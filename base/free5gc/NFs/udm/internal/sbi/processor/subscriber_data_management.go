@@ -475,11 +475,12 @@ func (p *Processor) GetSmDataProcedure(
 		return
 	}
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
-	logger.SdmLog.Infof("getSmDataProcedure: SUPI[%s] PLMNID[%s] DNN[%s] SNssai[%s]", supi, plmnID, Dnn, Snssai)
+	traceLog := logger.WithTraceContext(ctxForHTTP, logger.SdmLog)
+	traceLog.Infof("getSmDataProcedure: SUPI[%s] PLMNID[%s] DNN[%s] SNssai[%s]", supi, plmnID, Dnn, Snssai)
 
 	clientAPI, err := p.Consumer().CreateUDMClientToUDR(supi)
 	if err != nil {
-		logger.ProcLog.Errorf("CreateUDMClientToUDR Error: %+v", err)
+		traceLog.Errorf("CreateUDMClientToUDR Error: %+v", err)
 		problemDetails := openapi.ProblemDetailsSystemFailure(err.Error())
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)

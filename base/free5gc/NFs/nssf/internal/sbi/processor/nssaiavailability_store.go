@@ -50,6 +50,8 @@ func (p *Processor) NssaiAvailabilityNfInstancePatch(
 	c *gin.Context,
 	nssaiAvailabilityUpdateInfo plugin.PatchDocument, nfId string,
 ) {
+	traceLog := logger.WithTraceContext(c.Request.Context(), logger.NssaiavailLog)
+
 	var (
 		response       = &models.AuthorizedNssaiAvailabilityInfo{}
 		problemDetails *models.ProblemDetails
@@ -75,7 +77,7 @@ func (p *Processor) NssaiAvailabilityNfInstancePatch(
 			var err error
 			original, err = json.Marshal(temp)
 			if err != nil {
-				logger.NssaiavailLog.Errorf("Marshal error in NSSAIAvailabilityPatchProcedure: %+v", err)
+				traceLog.Errorf("Marshal error in NSSAIAvailabilityPatchProcedure: %+v", err)
 			}
 			original = bytes.ReplaceAll(original, []byte(dummyString), []byte(""))
 
@@ -111,7 +113,7 @@ func (p *Processor) NssaiAvailabilityNfInstancePatch(
 	}
 	patchJSON, err := json.Marshal(nssaiAvailabilityUpdateInfo)
 	if err != nil {
-		logger.NssaiavailLog.Errorf("Marshal error in NSSAIAvailabilityPatchProcedure: %+v", err)
+		traceLog.Errorf("Marshal error in NSSAIAvailabilityPatchProcedure: %+v", err)
 	}
 
 	patch, err := jsonpatch.DecodePatch(patchJSON)
@@ -155,7 +157,7 @@ func (p *Processor) NssaiAvailabilityNfInstancePatch(
 	// Return all authorized NSSAI availability information
 	response.AuthorizedNssaiAvailabilityData, err = util.AuthorizeOfAmfFromConfig(nfId)
 	if err != nil {
-		logger.NssaiavailLog.Errorf("util AuthorizeOfAmfFromConfig error in NSSAIAvailabilityPatchProcedure: %+v", err)
+		traceLog.Errorf("util AuthorizeOfAmfFromConfig error in NSSAIAvailabilityPatchProcedure: %+v", err)
 	}
 
 	// TODO: Return authorized NSSAI availability information of updated TAI only
@@ -168,6 +170,8 @@ func (p *Processor) NssaiAvailabilityNfInstanceUpdate(
 	c *gin.Context,
 	nssaiAvailabilityInfo models.NssaiAvailabilityInfo, nfId string,
 ) {
+	traceLog := logger.WithTraceContext(c.Request.Context(), logger.NssaiavailLog)
+
 	var (
 		response       = &models.AuthorizedNssaiAvailabilityInfo{}
 		problemDetails *models.ProblemDetails
@@ -228,7 +232,7 @@ func (p *Processor) NssaiAvailabilityNfInstanceUpdate(
 				response.AuthorizedNssaiAvailabilityData,
 				authorizedNssaiAvailabilityData)
 		} else {
-			logger.NssaiavailLog.Warn(err)
+			traceLog.Warn(err)
 		}
 	}
 

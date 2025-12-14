@@ -58,18 +58,20 @@ services:
       - ./cert:/free5gc/cert
     environment:
       - GIN_MODE=release
-      # 暫時完全不要送去 OTLP collector
-      - OTEL_TRACES_EXPORTER=none
+      - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
       - OTEL_LOGS_EXPORTER=none
-      - OTEL_EXPORTER_OTLP_ENDPOINT=
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://10.100.200.53:4318
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://10.100.200.53:4318/v1/traces
       - OTEL_EXPORTER_OTLP_INSECURE=true
     networks:
       privnet:
-        ipv4_address: 10.100.200.16
         aliases:
-          - amf.free5gc.org
+          - ausf.free5gc.org
+    logging:
+      driver: loki
+      options:
+        loki-url: http://10.100.200.52:3100/loki/api/v1/push
     depends_on:
       - free5gc-nrf
 

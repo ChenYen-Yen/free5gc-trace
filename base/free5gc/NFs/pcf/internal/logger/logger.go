@@ -1,7 +1,10 @@
 package logger
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/trace"
 
 	logger_util "github.com/free5gc/util/logger"
 )
@@ -49,4 +52,22 @@ func init() {
 	ProcLog = NfLog.WithField(logger_util.FieldCategory, "Proc")
 	SmPolicyLog = NfLog.WithField(logger_util.FieldCategory, "SMpolicy")
 	UtilLog = NfLog.WithField(logger_util.FieldCategory, "Util")
+}
+
+// WithTraceContext extracts trace_id and span_id from context and binds them to the logger
+func WithTraceContext(ctx context.Context, log *logrus.Entry) *logrus.Entry {
+	if ctx == nil {
+		return log
+	}
+
+	span := trace.SpanFromContext(ctx)
+	if !span.SpanContext().IsValid() {
+		return log
+	}
+
+	spanCtx := span.SpanContext()
+	return log.WithFields(logrus.Fields{
+		"trace_id": spanCtx.TraceID().String(),
+		"span_id":  spanCtx.SpanID().String(),
+	})
 }

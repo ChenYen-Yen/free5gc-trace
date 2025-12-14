@@ -24,13 +24,17 @@ import (
 func (p *Processor) ModifyAuthenticationProcedure(
 	c *gin.Context, collName string, ueId string, patchItem []models.PatchItem,
 ) {
+	ctx := c.Request.Context()
+	traceLog := logger.WithTraceContext(ctx, logger.DataRepoLog)
+	traceLog.Infof("ModifyAuthenticationProcedure: ueId=%s", ueId)
+
 	logger.ProcLog.Debugf("ModifyAuthenticationProcedure: %s %v", ueId, patchItem)
 
 	var err error
 	var origValue, newValue map[string]interface{}
 	filter := bson.M{"ueId": ueId}
 	if origValue, newValue, err = p.PatchDataToDBAndNotify(collName, ueId, patchItem, filter); err != nil {
-		logger.DataRepoLog.Errorf("ModifyAuthenticationProcedure err: %+v", err)
+		traceLog.Errorf("ModifyAuthenticationProcedure err: %+v", err)
 		problemDetails := util.ProblemDetailsModifyNotAllowed("")
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(http.StatusInternalServerError, problemDetails)
@@ -41,13 +45,17 @@ func (p *Processor) ModifyAuthenticationProcedure(
 }
 
 func (p *Processor) QueryAuthSubsDataProcedure(c *gin.Context, collName string, ueId string) {
+	ctx := c.Request.Context()
+	traceLog := logger.WithTraceContext(ctx, logger.DataRepoLog)
+	traceLog.Infof("QueryAuthSubsDataProcedure: ueId=%s", ueId)
+
 	filter := bson.M{"ueId": ueId}
 	data, pd := p.GetDataFromDB(collName, filter)
 	if pd != nil {
 		if pd.Status == http.StatusNotFound {
-			logger.DataRepoLog.Warnf("QueryAuthSubsDataProcedure err: %s", pd.Title)
+			traceLog.Warnf("QueryAuthSubsDataProcedure err: %s", pd.Title)
 		} else {
-			logger.DataRepoLog.Errorf("QueryAuthSubsDataProcedure err: %s", pd.Detail)
+			traceLog.Errorf("QueryAuthSubsDataProcedure err: %s", pd.Detail)
 		}
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)

@@ -1,7 +1,10 @@
 package logger
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/trace"
 
 	logger_util "github.com/free5gc/util/logger"
 )
@@ -30,6 +33,8 @@ func init() {
 	}
 
 	Log = logger_util.New(fieldsOrder)
+	// use JSON formatter so structured fields (trace_id/span_id) appear as JSON keys
+	Log.SetFormatter(&logrus.JSONFormatter{})
 	NfLog = Log.WithField(logger_util.FieldNF, "AUSF")
 	MainLog = NfLog.WithField(logger_util.FieldCategory, "Main")
 	InitLog = NfLog.WithField(logger_util.FieldCategory, "Init")
@@ -43,4 +48,21 @@ func init() {
 	AuthELog = NfLog.WithField(logger_util.FieldCategory, "Eap")
 	UtilLog = NfLog.WithField(logger_util.FieldCategory, "Util")
 	AppLog = NfLog.WithField(logger_util.FieldCategory, "AppLog")
+}
+
+func WithTraceContext(ctx context.Context, base *logrus.Entry) *logrus.Entry {
+	if ctx == nil || base == nil {
+		return base
+	}
+
+	span := trace.SpanFromContext(ctx)
+	sc := span.SpanContext()
+	if !sc.IsValid() {
+		return base
+	}
+
+	return base.WithFields(logrus.Fields{
+		"trace_id": sc.TraceID().String(),
+		"span_id":  sc.SpanID().String(),
+	})
 }
