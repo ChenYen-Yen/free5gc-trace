@@ -15,6 +15,10 @@ import (
 	"github.com/free5gc/smf/internal/logger"
 	"github.com/free5gc/smf/internal/util"
 	sbi_metrics "github.com/free5gc/util/metrics/sbi"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type nudmService struct {
@@ -105,10 +109,21 @@ func (s *nudmService) UeCmRegistration(smCtx *smf_context.SMContext) (
 		" PduSessionId:", registrationData.PduSessionId, " SNssai:", registrationData.SingleNssai,
 		" Dnn:", registrationData.Dnn, " PlmnId:", registrationData.PlmnId)
 
+	// Create tracing span
+	tracer := otel.Tracer("smf-sbi")
+	_, span := tracer.Start(context.Background(), "SMF → UDM: UeCmRegistration")
+	span.SetAttributes(
+		attribute.String("ue.supi", smCtx.Supi),
+		attribute.Int("pdu_session_id", int(smCtx.PduSessionId)),
+		attribute.String("dnn", smCtx.Dnn),
+	)
+	defer span.End()
+
 	ctx, pd, err := smf_context.GetSelf().GetTokenCtx(models.ServiceName_NUDM_UECM, models.NrfNfManagementNfType_UDM)
 	if err != nil {
 		return pd, err
 	}
+	ctx = trace.ContextWithSpan(ctx, span)
 
 	request := &UEContextManagement.RegistrationRequest{
 		UeId:            &smCtx.Supi,
