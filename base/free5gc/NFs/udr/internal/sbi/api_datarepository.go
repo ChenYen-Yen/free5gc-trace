@@ -2085,9 +2085,12 @@ func (s *Server) HandleQuerySmsData(c *gin.Context) {
 
 // HTTPQuerySmData - Retrieves the Session Management subscription data of a UE
 func (s *Server) HandleQuerySmData(c *gin.Context) {
-	logger.DataRepoLog.Tracef("Handle QuerySmData")
+	// logger.DataRepoLog.Tracef("Handle QuerySmData")
 
-	logger.DataRepoLog.Errorf("SIMULATED ERROR: Manual error")
+	// logger.DataRepoLog.Errorf("SIMULATED ERROR: Manual error")
+	ctx := c.Request.Context()
+	traceLog := logger.WithTraceContext(ctx, logger.DataRepoLog)
+	traceLog.Infof("Handle QuerySmData")
 	problemDetails := models.ProblemDetails{
 		Title:  "Manually Injected 500 Error for SM-Data",
 		Status: http.StatusInternalServerError,
