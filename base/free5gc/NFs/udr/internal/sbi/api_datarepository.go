@@ -967,6 +967,17 @@ func (s *Server) HandleQueryAmData(c *gin.Context) {
 	traceLog := logger.WithTraceContext(ctx, logger.DataRepoLog)
 	traceLog.Infof("Handle QueryAmData")
 
+	traceLog.Errorf("Manual 500 error")
+	problemDetails := models.ProblemDetails{
+		Title:  "Manually Injected 500 Error for SM-Data",
+		Status: http.StatusInternalServerError,
+		Detail: "Failing GetSmData to test Trace/Log jumping",
+		Cause:  "SYSTEM_FAILURE",
+	}
+	// 回傳 500
+	c.JSON(http.StatusInternalServerError, problemDetails)
+	return
+
 	collName := "subscriptionData.provisionedData.amData"
 	servingPlmnId := c.Params.ByName("servingPlmnId")
 	ueId := c.Params.ByName("ueId")
@@ -2089,17 +2100,6 @@ func (s *Server) HandleQuerySmData(c *gin.Context) {
 	ctx := c.Request.Context()
 	traceLog := logger.WithTraceContext(ctx, logger.DataRepoLog)
 	traceLog.Infof("Handle QuerySmData")
-
-	traceLog.Errorf("Manual 500 error")
-	problemDetails := models.ProblemDetails{
-		Title:  "Manually Injected 500 Error for SM-Data",
-		Status: http.StatusInternalServerError,
-		Detail: "Failing GetSmData to test Trace/Log jumping",
-		Cause:  "SYSTEM_FAILURE",
-	}
-	// 回傳 500
-	c.JSON(http.StatusInternalServerError, problemDetails)
-	return
 
 	collName := "subscriptionData.provisionedData.smData"
 	ueId := c.Params.ByName("ueId")
