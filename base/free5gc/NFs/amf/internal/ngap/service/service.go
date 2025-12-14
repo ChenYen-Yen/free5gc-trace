@@ -13,7 +13,6 @@ import (
 	"github.com/free5gc/amf/pkg/factory"
 	"github.com/free5gc/ngap"
 	"github.com/free5gc/sctp"
-	"go.opentelemetry.io/otel"
 )
 
 type NGAPHandler struct {
@@ -183,21 +182,19 @@ func Stop() {
 }
 
 func handleConnection(conn *sctp.SCTPConn, bufsize uint32, handler NGAPHandler) {
-	tracer := otel.Tracer("amf")
-	ctx, span := tracer.Start(context.Background(), "ngap.connection")
-	defer span.End()
+	// Use background context without creating connection-level span
+	// Each UE Registration Flow will create its own independent trace
+	ctx := context.Background()
 
 	defer func() {
 		if p := recover(); p != nil {
 			// Print stack for panic to log. Fatalf() will let program exit.
-			log := logger.WithTraceContext(ctx, logger.NgapLog)
-			log.Fatalf("panic: %v\n%s", p, string(debug.Stack()))
+			logger.NgapLog.Fatalf("panic: %v\n%s", p, string(debug.Stack()))
 		}
 
 		// if AMF call Stop(), then conn.Close() will return EBADF because conn has been closed inside Stop()
 		if err := conn.Close(); err != nil && err != syscall.EBADF {
-			log := logger.WithTraceContext(ctx, logger.NgapLog)
-			log.Errorf("close connection error: %+v", err)
+			logger.NgapLog.Errorf("close connection error: %+v", err)
 		}
 		connections.Delete(conn)
 	}()
@@ -246,11 +243,9 @@ func handleConnection(conn *sctp.SCTPConn, bufsize uint32, handler NGAPHandler) 
 
 			// TODO: concurrent on per-UE message
 			if handler.HandleMessageWithContext != nil {
-				// Create a per-message child span so each NGAP message has its own trace context
-				// This allows ran.Log to include the specific message's trace_id/span_id
-				msgCtx, msgSpan := tracer.Start(ctx, "ngap.message")
-				handler.HandleMessageWithContext(msgCtx, conn, buf[:n])
-				msgSpan.End()
+				// Pass connection context directly without creating intermediate span
+				// This allows handlers to create their own root spans (e.g., UE Registration Flow)
+				handler.HandleMessageWithContext(ctx, conn, buf[:n])
 			} else {
 				handler.HandleMessage(conn, buf[:n])
 			}

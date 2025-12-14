@@ -2,6 +2,8 @@
 package ngap
 
 import (
+	stdctx "context"
+
 	"github.com/free5gc/amf/internal/context"
 	"github.com/free5gc/amf/internal/logger"
 	ngap_message "github.com/free5gc/amf/internal/ngap/message"
@@ -4290,7 +4292,7 @@ func handlerInitialContextSetupResponse(ran *context.AmfRan, successfulOutcome *
 	handleInitialContextSetupResponseMain(ran, ranUe /* may be nil */, pDUSessionResourceSetupListCxtRes /* may be nil */, pDUSessionResourceFailedToSetupListCxtRes /* may be nil */, criticalityDiagnostics /* may be nil */)
 }
 
-func handlerInitialUEMessage(ran *context.AmfRan, message *ngapType.NGAPPDU, initiatingMessage *ngapType.InitiatingMessage) {
+func handlerInitialUEMessage(ctx stdctx.Context, ran *context.AmfRan, message *ngapType.NGAPPDU, initiatingMessage *ngapType.InitiatingMessage) {
 	var rANUENGAPID *ngapType.RANUENGAPID
 	var nASPDU *ngapType.NASPDU
 	var userLocationInformation *ngapType.UserLocationInformation
@@ -4509,7 +4511,7 @@ func handlerInitialUEMessage(ran *context.AmfRan, message *ngapType.NGAPPDU, ini
 
 	metricStatusOk = true
 
-	// func handleInitialUEMessageMain(ran *context.AmfRan,
+	// func handleInitialUEMessageMain(ctx stdctx.Context, ran *context.AmfRan,
 	//	message *ngapType.NGAPPDU,
 	//	rANUENGAPID *ngapType.RANUENGAPID,
 	//	nASPDU *ngapType.NASPDU,
@@ -4517,7 +4519,7 @@ func handlerInitialUEMessage(ran *context.AmfRan, message *ngapType.NGAPPDU, ini
 	//	rRCEstablishmentCause *ngapType.RRCEstablishmentCause,
 	//	fiveGSTMSI *ngapType.FiveGSTMSI,
 	//	uEContextRequest *ngapType.UEContextRequest) {
-	handleInitialUEMessageMain(ran, message, rANUENGAPID, nASPDU, userLocationInformation, rRCEstablishmentCause /* may be nil */, fiveGSTMSI /* may be nil */, uEContextRequest /* may be nil */)
+	handleInitialUEMessageMain(ctx, ran, message, rANUENGAPID, nASPDU, userLocationInformation, rRCEstablishmentCause /* may be nil */, fiveGSTMSI /* may be nil */, uEContextRequest /* may be nil */)
 }
 
 func handlerLocationReport(ran *context.AmfRan, initiatingMessage *ngapType.InitiatingMessage) {

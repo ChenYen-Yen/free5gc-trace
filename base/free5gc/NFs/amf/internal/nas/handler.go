@@ -55,6 +55,10 @@ func HandleNAS(ranUe *amf_context.RanUe, procedureCode int64, nasPdu []byte, ini
 			// Assume we have an existing UE context in CM-CONNECTED state. (RanUe <-> AmfUe)
 			// We will release it if the new UE context has a valid security context(Authenticated) in line 50.
 			ranUe.AmfUe = amfSelf.NewAmfUe("")
+			// Transfer trace context to new AmfUe
+			if ranUe.TraceContext != nil {
+				ranUe.AmfUe.TraceContext = ranUe.TraceContext
+			}
 			gmm_common.AttachRanUeToAmfUeAndReleaseOldIfAny(ranUe.AmfUe, ranUe)
 		}
 	}
