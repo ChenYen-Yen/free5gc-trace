@@ -68,7 +68,8 @@ func NewServer(amf ServerAmf, tlsKeyLogPath string) (*Server, error) {
 }
 
 func newRouter(s *Server) *gin.Engine {
-	router := logger_util.NewGinWithLogrus(logger.GinLog, otelgin.Middleware("amf"))
+	router := logger_util.NewGinWithLogrus(logger.GinLog)
+	router.Use(otelgin.Middleware("amf-sbi"))
 
 	// add a small test endpoint always mounted so we can validate trace-aware logs
 	router.GET("/_trace_test", func(c *gin.Context) {

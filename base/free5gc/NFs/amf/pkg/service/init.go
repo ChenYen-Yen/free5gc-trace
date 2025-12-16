@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -335,13 +336,11 @@ func (a *AmfApp) terminateProcedure() {
 }
 
 func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.TracerProvider, error) {
-	// 1. 建立 console trace exporter（輸出到 stdout）
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
-		return nil, fmt.Errorf("OTEL_EXPORTER_OTLP_ENDPOINT not set")
+		endpoint = "tempo:4318" // 跟 docker-compose 配在一起
 	}
 
-	// HTTP OTLP client，endpoint 例如 "tempo:4318"
 	client := otlptracehttp.NewClient(
 		otlptracehttp.WithEndpoint(endpoint),
 		otlptracehttp.WithInsecure(),
@@ -349,7 +348,7 @@ func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.Trac
 
 	exporter, err := otlptrace.New(ctx, client)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create OTLP HTTP exporter: %w", err)
 	}
 
 	res, err := resource.New(
@@ -362,15 +361,14 @@ func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.Trac
 		),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create resource: %w", err)
 	}
 
-	// Configure batcher with shorter intervals to reduce "root span not received" issues
 	batchOptions := []sdktrace.BatchSpanProcessorOption{
-		sdktrace.WithMaxExportBatchSize(512), // Default: 512
-		sdktrace.WithBatchTimeout(1000),      // 1 second (default: 5s) - faster export
-		sdktrace.WithExportTimeout(30000),    // 30 seconds
-		sdktrace.WithMaxQueueSize(2048),      // Default: 2048
+		sdktrace.WithMaxExportBatchSize(512),
+		sdktrace.WithBatchTimeout(1 * time.Second),
+		sdktrace.WithExportTimeout(30 * time.Second),
+		sdktrace.WithMaxQueueSize(2048),
 	}
 
 	tp := sdktrace.NewTracerProvider(
@@ -386,5 +384,6 @@ func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.Trac
 		),
 	)
 
+	logger.AppLog.Infof("TracerProvider for %s initialized (HTTP), endpoint=%s", serviceName, endpoint)
 	return tp, nil
 }
