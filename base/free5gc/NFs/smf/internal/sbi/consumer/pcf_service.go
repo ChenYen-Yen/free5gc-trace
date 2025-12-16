@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"regexp"
@@ -17,6 +18,10 @@ import (
 	smf_context "github.com/free5gc/smf/internal/context"
 	"github.com/free5gc/util/flowdesc"
 	sbi_metrics "github.com/free5gc/util/metrics/sbi"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type npcfService struct {
@@ -91,11 +96,22 @@ func (s *npcfService) SendSMPolicyAssociationCreate(smContext *smf_context.SMCon
 	}
 	smPolicyData.SuppFeat = "F"
 
+	// Create tracing span
+	tracer := otel.Tracer("smf-sbi")
+	_, span := tracer.Start(context.Background(), "SMF → PCF: SMPolicyAssociationCreate")
+	span.SetAttributes(
+		attribute.String("ue.supi", smContext.Supi),
+		attribute.Int("pdu_session_id", int(smContext.PDUSessionID)),
+		attribute.String("dnn", smContext.Dnn),
+	)
+	defer span.End()
+
 	ctx, _, err := smf_context.GetSelf().
 		GetTokenCtx(models.ServiceName_NPCF_SMPOLICYCONTROL, models.NrfNfManagementNfType_PCF)
 	if err != nil {
 		return "", nil, err
 	}
+	ctx = trace.ContextWithSpan(ctx, span)
 
 	var smPolicyID string
 	var smPolicyDecision *models.SmPolicyDecision

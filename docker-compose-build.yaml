@@ -391,8 +391,6 @@ services:
     container_name: ueransim
     build:
       context: ./ueransim
-      args:
-        TARGET_ARCH: aarch64
     command: ./nr-gnb -c ./config/gnbcfg.yaml
     volumes:
       - ./config/gnbcfg.yaml:/ueransim/config/gnbcfg.yaml
@@ -412,28 +410,6 @@ services:
     depends_on:
       - free5gc-amf
       - free5gc-upf
-
-  ue:
-    container_name: ue
-    build:
-      context: ./ueransim
-    command: ./nr-ue -c ./config/uecfg.yaml
-    volumes:
-      - ./config/uecfg.yaml:/ueransim/config/uecfg.yaml
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - "/dev/net/tun"
-    logging:
-      driver: loki
-      options:
-        loki-url: http://10.100.200.52:3100/loki/api/v1/push
-    networks:
-      privnet:
-        aliases:
-          - ue.free5gc.org
-    depends_on:
-      - ueransim
 
   n3iwue:
     container_name: n3iwue
