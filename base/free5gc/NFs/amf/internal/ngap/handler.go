@@ -12,6 +12,7 @@ import (
 	"github.com/free5gc/amf/internal/context"
 	gmm_common "github.com/free5gc/amf/internal/gmm/common"
 	gmm_message "github.com/free5gc/amf/internal/gmm/message"
+	"github.com/free5gc/amf/internal/logger"
 	business_metrics "github.com/free5gc/amf/internal/metrics/business"
 	amf_nas "github.com/free5gc/amf/internal/nas"
 	"github.com/free5gc/amf/internal/nas/nas_security"
@@ -143,6 +144,13 @@ func handleUplinkNASTransportMain(ran *context.AmfRan,
 	)
 
 	amfUe.TraceContext = ctx
+	ranUe.TraceContext = ctx
+
+	ranUe.Log = logger.WithTraceContext(ctx, ranUe.Log)
+	if amfUe != nil {
+		amfUe.GmmLog = logger.WithTraceContext(ctx, amfUe.GmmLog)
+		amfUe.NASLog = logger.WithTraceContext(ctx, amfUe.NASLog)
+	}
 
 	if userLocationInformation != nil {
 		ranUe.UpdateLocation(userLocationInformation)
@@ -465,10 +473,10 @@ func handleInitialUEMessageMain(ctx stdctx.Context, ran *context.AmfRan,
 		}
 	}
 
-	// Create a per-UE / per-procedure root span as independent trace
-	// Each UE Registration Flow is a separate trace root for better isolation
+	// Create a per-UE / per-procedure root span building on connection context
+	// Use the passed ctx to maintain trace chain from SCTP connection
 	rootTracer := otel.Tracer("amf-procedure")
-	rootCtx, rootSpan := rootTracer.Start(stdctx.Background(), "UE Registration Flow")
+	rootCtx, rootSpan := rootTracer.Start(ctx, "UE Registration Flow")
 	defer rootSpan.End()
 
 	rootSpan.SetAttributes(
@@ -493,6 +501,13 @@ func handleInitialUEMessageMain(ctx stdctx.Context, ran *context.AmfRan,
 		attribute.String("ran.id", fmt.Sprintf("%+v", ran.RanId)),
 	)
 	ranUe.TraceContext = ctx
+
+	// Update ran context and logger with new span context
+	ran.Ctx = ctx
+	ran.Log = logger.WithTraceContext(ctx, ran.Log)
+
+	// Update ranUe logger with new span context
+	ranUe.Log = logger.WithTraceContext(ctx, ranUe.Log)
 
 	spanCtx := span.SpanContext()
 	ran.Log.Infof("UE root traceID=%s ranUeNgapId=%d", spanCtx.TraceID().String(), rANUENGAPID.Value)

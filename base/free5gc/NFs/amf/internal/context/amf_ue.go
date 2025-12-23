@@ -292,6 +292,8 @@ func (ue *AmfUe) init() {
 	ue.onGoing[models.AccessType__3_GPP_ACCESS].Procedure = OnGoingProcedureNothing
 	ue.ReleaseCause = make(map[models.AccessType]*CauseAll)
 	ue.UeCmRegistered = make(map[models.AccessType]bool)
+
+	// Initialize working loggers
 	ue.GmmLog = logger.GmmLog
 	ue.NASLog = logger.GmmLog
 	ue.ProducerLog = logger.ProducerLog

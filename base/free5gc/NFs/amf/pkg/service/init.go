@@ -338,7 +338,7 @@ func (a *AmfApp) terminateProcedure() {
 func initTracerProvider(ctx context.Context, serviceName string) (*sdktrace.TracerProvider, error) {
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
-		endpoint = "tempo:4318" // 跟 docker-compose 配在一起
+		endpoint = "tempo:4318"
 	}
 
 	client := otlptracehttp.NewClient(

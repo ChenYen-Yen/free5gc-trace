@@ -14,7 +14,7 @@ import (
 )
 
 func Index(c *gin.Context) {
-	log := logger.WithTrace(c, logger.GinLog)
+	log := logger.WithTraceContext(c, logger.GinLog)
 	log.Info("Index handler called")
 	c.String(http.StatusOK, "Hello World!")
 }

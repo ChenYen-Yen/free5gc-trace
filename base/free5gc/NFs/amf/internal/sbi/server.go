@@ -73,7 +73,7 @@ func newRouter(s *Server) *gin.Engine {
 
 	// add a small test endpoint always mounted so we can validate trace-aware logs
 	router.GET("/_trace_test", func(c *gin.Context) {
-		log := logger.WithTrace(c, logger.GinLog)
+		log := logger.WithTraceContext(c, logger.GinLog)
 		log.Info("_trace_test handler invoked")
 		c.String(200, "ok")
 	})

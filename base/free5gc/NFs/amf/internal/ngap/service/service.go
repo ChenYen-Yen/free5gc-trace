@@ -241,7 +241,6 @@ func handleConnection(conn *sctp.SCTPConn, bufsize uint32, handler NGAPHandler) 
 			logger.NgapLog.Tracef("Read %d bytes", n)
 			logger.NgapLog.Tracef("Packet content:\n%+v", hex.Dump(buf[:n]))
 
-			// TODO: concurrent on per-UE message
 			if handler.HandleMessageWithContext != nil {
 				// Pass connection context directly without creating intermediate span
 				// This allows handlers to create their own root spans (e.g., UE Registration Flow)

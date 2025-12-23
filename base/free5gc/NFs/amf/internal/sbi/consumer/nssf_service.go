@@ -7,6 +7,7 @@ import (
 	"context"
 
 	amf_context "github.com/free5gc/amf/internal/context"
+	"github.com/free5gc/amf/internal/logger"
 	"github.com/free5gc/openapi"
 	"github.com/free5gc/openapi/models"
 	Nnssf_NSSelection "github.com/free5gc/openapi/nssf/NSSelection"
@@ -82,6 +83,7 @@ func (s *nssfService) NSSelectionGetForRegistration(ue *amf_context.AmfUe, reque
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	sliceInfo := models.SliceInfoForRegistration{
 		SubscribedNssai: ue.SubscribedNssai,
@@ -170,6 +172,7 @@ func (s *nssfService) NSSelectionGetForPduSession(ue *amf_context.AmfUe, snssai 
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	sliceInfoForPduSession := models.SliceInfoForPduSession{
 		SNssai:            &snssai,
@@ -186,7 +189,6 @@ func (s *nssfService) NSSelectionGetForPduSession(ue *amf_context.AmfUe, snssai 
 	}
 
 	//add
-	// res, localErr := client.NetworkSliceInformationDocumentApi.NSSelectionGet(ctx, &paramOpt)
 	res, localErr := client.NetworkSliceInformationDocumentApi.NSSelectionGet(ctxForHTTP, &paramOpt)
 	if localErr == nil {
 		return &res.AuthorizedNetworkSliceInfo, nil, nil

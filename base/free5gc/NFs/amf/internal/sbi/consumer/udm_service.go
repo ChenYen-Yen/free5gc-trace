@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	amf_context "github.com/free5gc/amf/internal/context"
+	"github.com/free5gc/amf/internal/logger"
 	"github.com/free5gc/amf/pkg/factory"
 	"github.com/free5gc/openapi"
 	"github.com/free5gc/openapi/models"
@@ -105,6 +106,7 @@ func (s *nudmService) PutUpuAck(ue *amf_context.AmfUe, upuMacIue string) error {
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	ackInfo := models.AcknowledgeInfo{
 		UpuMacIue: upuMacIue,
@@ -158,6 +160,7 @@ func (s *nudmService) SDMGetAmData(ue *amf_context.AmfUe) (problemDetails *model
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	//add
 	// data, localErr := client.AccessAndMobilitySubscriptionDataRetrievalApi.GetAmData(
@@ -224,6 +227,7 @@ func (s *nudmService) SDMGetSmfSelectData(ue *amf_context.AmfUe) (problemDetails
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	//add
 	// data, localErr := client.SMFSelectionSubscriptionDataRetrievalApi.
@@ -286,6 +290,7 @@ func (s *nudmService) SDMGetUeContextInSmfData(
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	getUeCtxInSmfDataReq := Nudm_SubscriberDataManagement.GetUeCtxInSmfDataRequest{
 		Supi: &ue.Supi,
@@ -349,6 +354,7 @@ func (s *nudmService) SDMSubscribe(ue *amf_context.AmfUe) (problemDetails *model
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	sdmSubscription := models.SdmSubscription{
 		NfInstanceId: amfSelf.NfId,
@@ -424,6 +430,7 @@ func (s *nudmService) SDMGetSliceSelectionSubscriptionData(
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	//add
 	// nssai, localErr := client.SliceSelectionSubscriptionDataRetrievalApi.
@@ -502,6 +509,7 @@ func (s *nudmService) SDMUnsubscribe(ue *amf_context.AmfUe) (problemDetails *mod
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	unsubscribeReq := Nudm_SubscriberDataManagement.UnsubscribeRequest{
 		UeId:           &ue.Supi,
@@ -566,6 +574,7 @@ func (s *nudmService) UeCmRegistration(
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	switch accessType {
 	case models.AccessType__3_GPP_ACCESS:
@@ -689,6 +698,7 @@ func (s *nudmService) UeCmDeregistration(
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	switch accessType {
 	case models.AccessType__3_GPP_ACCESS:
@@ -703,8 +713,6 @@ func (s *nudmService) UeCmDeregistration(
 		}
 
 		//add
-		// _, localErr := client.ParameterUpdateInTheAMFRegistrationFor3GPPAccessApi.Update3GppRegistration(ctx,
-		// 	&modificationReq)
 		_, localErr := client.ParameterUpdateInTheAMFRegistrationFor3GPPAccessApi.Update3GppRegistration(ctxForHTTP,
 			&modificationReq)
 		if localErr == nil {

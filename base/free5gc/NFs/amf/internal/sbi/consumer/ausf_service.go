@@ -92,6 +92,7 @@ func (s *nausfService) SendUEAuthenticationAuthenticateRequest(ue *amf_context.A
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	servedGuami := amfSelf.ServedGuamiList[0]
 
@@ -179,6 +180,7 @@ func (s *nausfService) SendAuth5gAkaConfirmRequest(ue *amf_context.AmfUe, resSta
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	// confirmUri.RequestURI() = "/nausf-auth/v1/ue-authentications/{authctxId}/5g-aka-confirmation"
 	// splituri = ["","nausf-auth","ue-authentications",{authctxId},"5g-aka-confirmation"]
@@ -283,6 +285,7 @@ func (s *nausfService) SendEapAuthConfirmRequest(ue *amf_context.AmfUe, eapMsg n
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 	ue.TraceContext = spanCtx
+	ue.GmmLog = logger.WithTraceContext(spanCtx, ue.GmmLog)
 
 	//add
 	// eapSession, localErr := client.DefaultApi.EapAuthMethod(ctx, &eapSessionReq)

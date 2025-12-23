@@ -102,22 +102,22 @@ func (s *nnrfService) SendSearchNFInstances(baseCtx context.Context, nrfUri stri
 		return nil, err
 	}
 
-	// add: 在已附帶 token 的 ctx 上開一個 SBI span
+	// add
 	tracer := otel.Tracer("amf-sbi")
-	_, span := tracer.Start(baseCtx, "AMF → NRF: SendSearchNFInstances")
+	spanCtx, span := tracer.Start(baseCtx, "AMF → NRF: SendSearchNFInstances")
 	span.SetAttributes(
 		attribute.String("target.nf", "NRF"),
 	)
 	defer span.End()
+	traceLog := logger.WithTraceContext(spanCtx, logger.ConsumerLog)
 
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 
 	//add
-	// res, err := client.NFInstancesStoreApi.SearchNFInstances(ctx, param)
 	res, err := client.NFInstancesStoreApi.SearchNFInstances(ctxForHTTP, param)
 	var result *models.SearchResult
 	if err != nil {
-		logger.ConsumerLog.Errorf("SearchNFInstances failed: %+v", err)
+		traceLog.Errorf("SearchNFInstances failed: %+v", err)
 	}
 	if res != nil {
 		result = &res.SearchResult
@@ -362,7 +362,6 @@ func (s *nnrfService) SendDeregisterNFInstance() (problemDetails *models.Problem
 	}
 
 	//add
-	// _, err = client.NFInstanceIDDocumentApi.DeregisterNFInstance(ctx, request)
 	_, err = client.NFInstanceIDDocumentApi.DeregisterNFInstance(ctxForHTTP, request)
 	if err != nil {
 		switch apiErr := err.(type) {
