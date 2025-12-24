@@ -93,6 +93,9 @@ func (s *nudmService) SendAuthResultToUDM(
 		attribute.String("udm.url", udmUrl),
 	)
 	defer span.End()
+
+	traceLog := logger.WithTraceContext(spanCtx, logger.ConsumerLog)
+
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 
 	request := &Nudm_UEAU.ConfirmAuthRequest{
@@ -100,11 +103,9 @@ func (s *nudmService) SendAuthResultToUDM(
 		AuthEvent: &authEvent, // Make sure this is correctly referenced
 	}
 
-	//add
-	// _, confirmAuthErr := client.ConfirmAuthApi.ConfirmAuth(ctx, request)
 	_, confirmAuthErr := client.ConfirmAuthApi.ConfirmAuth(ctxForHTTP, request)
 	if confirmAuthErr != nil {
-		logger.ConsumerLog.Errorf("Error in ConfirmAuth: %v", confirmAuthErr)
+		traceLog.Errorf("Error in ConfirmAuth: %v", confirmAuthErr)
 	}
 
 	return confirmAuthErr, spanCtx
@@ -150,8 +151,6 @@ func (s *nudmService) GenerateAuthDataApi(
 		UdmUeauAuthenticationInfoRequest: &udmAuthInfoReq,
 	}
 
-	//add
-	// rsp, err := client.GenerateAuthDataApi.GenerateAuthData(ctx, request)
 	rsp, err := client.GenerateAuthDataApi.GenerateAuthData(ctxForHTTP, request)
 	if err != nil {
 		var problemDetails models.ProblemDetails

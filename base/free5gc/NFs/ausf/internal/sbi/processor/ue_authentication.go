@@ -94,8 +94,10 @@ func (p *Processor) EapAuthComfirmRequestProcedure(
 	c.Request = c.Request.WithContext(ctx)
 	ausfCurrentContext.TraceContext = ctx
 
+	traceLog := logger.WithTraceContext(ctx, logger.AuthELog)
+
 	if ausfCurrentContext.AuthStatus == models.AusfUeAuthenticationAuthResult_FAILURE {
-		logger.AuthELog.Warnf("Authentication failed with status: %s", ausfCurrentContext.AuthStatus)
+		traceLog.Warnf("Authentication failed with status: %s", ausfCurrentContext.AuthStatus)
 		eapFailPkt := ConstructEapNoTypePkt(radius.EapCodeFailure, 0)
 		eapSession.EapPayload = eapFailPkt
 		eapSession.AuthResult = models.AusfUeAuthenticationAuthResult_FAILURE
@@ -106,7 +108,7 @@ func (p *Processor) EapAuthComfirmRequestProcedure(
 
 	var eapPayload []byte
 	if eapPayloadTmp, err := base64.StdEncoding.DecodeString(updateEapSession.EapPayload); err != nil {
-		logger.AuthELog.Warnf("EAP Payload decode failed: %+v", err)
+		traceLog.Warnf("EAP Payload decode failed: %+v", err)
 	} else {
 		eapPayload = eapPayloadTmp
 	}
@@ -124,7 +126,7 @@ func (p *Processor) EapAuthComfirmRequestProcedure(
 		eapOK = false
 		eapErrStr = "eap packet type error"
 	} else if decodeEapAkaPrimePkt, err := decodeEapAkaPrime(eapContent.Contents); err != nil {
-		logger.AuthELog.Warnf("EAP-AKA' decode failed: %+v", err)
+		traceLog.Warnf("EAP-AKA' decode failed: %+v", err)
 		eapOK = false
 		eapErrStr = "eap packet error"
 	} else {
@@ -133,7 +135,7 @@ func (p *Processor) EapAuthComfirmRequestProcedure(
 			K_autStr := ausfCurrentContext.K_aut
 			var K_aut []byte
 			if K_autTmp, err := hex.DecodeString(K_autStr); err != nil {
-				logger.AuthELog.Warnf("K_aut decode error: %+v", err)
+				traceLog.Warnf("K_aut decode error: %+v", err)
 			} else {
 				K_aut = K_autTmp
 			}
@@ -146,7 +148,7 @@ func (p *Processor) EapAuthComfirmRequestProcedure(
 				eapOK = false
 				eapErrStr = "EAP-AKA' integrity check fail"
 			} else if XRES == RES {
-				logger.AuthELog.Infoln("Correct RES value, EAP-AKA' auth succeed")
+				traceLog.Infoln("Correct RES value, EAP-AKA' auth succeed")
 				eapSession.KSeaf = ausfCurrentContext.Kseaf
 				eapSession.Supi = currentSupi
 				eapSession.AuthResult = models.AusfUeAuthenticationAuthResult_SUCCESS
@@ -161,7 +163,7 @@ func (p *Processor) EapAuthComfirmRequestProcedure(
 					servingNetworkName,
 					udmUrl)
 				if sendErr != nil {
-					logger.AuthELog.Infoln(sendErr.Error())
+					traceLog.Infoln(sendErr.Error())
 					problemDetails := models.ProblemDetails{
 						Cause: "UPSTREAM_SERVER_ERROR",
 					}
@@ -180,7 +182,7 @@ func (p *Processor) EapAuthComfirmRequestProcedure(
 		case ausf_context.AKA_AUTHENTICATION_REJECT_SUBTYPE:
 			ausfCurrentContext.AuthStatus = models.AusfUeAuthenticationAuthResult_FAILURE
 		case ausf_context.AKA_SYNCHRONIZATION_FAILURE_SUBTYPE:
-			logger.AuthELog.Warnf("EAP-AKA' synchronziation failure")
+			traceLog.Warnf("EAP-AKA' synchronziation failure")
 			if ausfCurrentContext.Resynced {
 				eapOK = false
 				eapErrStr = "2 consecutive Synch Failure, terminate authentication procedure"
@@ -199,7 +201,7 @@ func (p *Processor) EapAuthComfirmRequestProcedure(
 		case ausf_context.AKA_NOTIFICATION_SUBTYPE:
 			ausfCurrentContext.AuthStatus = models.AusfUeAuthenticationAuthResult_FAILURE
 		case ausf_context.AKA_CLIENT_ERROR_SUBTYPE:
-			logger.AuthELog.Warnf("EAP-AKA' failure: receive client-error")
+			traceLog.Warnf("EAP-AKA' failure: receive client-error")
 			ausfCurrentContext.AuthStatus = models.AusfUeAuthenticationAuthResult_FAILURE
 		default:
 			ausfCurrentContext.AuthStatus = models.AusfUeAuthenticationAuthResult_FAILURE
@@ -207,11 +209,11 @@ func (p *Processor) EapAuthComfirmRequestProcedure(
 	}
 
 	if !eapOK {
-		logger.AuthELog.Warnf("EAP-AKA' failure: %s", eapErrStr)
+		traceLog.Warnf("EAP-AKA' failure: %s", eapErrStr)
 		sendErr, spanCtxUDM := p.Consumer().SendAuthResultToUDM(ctx, eapSessionID, models.UdmUeauAuthType_EAP_AKA_PRIME,
 			false, servingNetworkName, ausfCurrentContext.UdmUeauUrl)
 		if sendErr != nil {
-			logger.AuthELog.Infoln(sendErr.Error())
+			traceLog.Infoln(sendErr.Error())
 			problemDetails := models.ProblemDetails{
 				Status: http.StatusInternalServerError,
 				Cause:  "UPSTREAM_SERVER_ERROR",
@@ -239,7 +241,7 @@ func (p *Processor) EapAuthComfirmRequestProcedure(
 		sendErr, spanCtxUDM := p.Consumer().SendAuthResultToUDM(ctx, eapSessionID, models.UdmUeauAuthType_EAP_AKA_PRIME, false,
 			servingNetworkName, ausfCurrentContext.UdmUeauUrl)
 		if sendErr != nil {
-			logger.AuthELog.Infoln(sendErr.Error())
+			traceLog.Infoln(sendErr.Error())
 			var problemDetails models.ProblemDetails
 			problemDetails.Status = http.StatusInternalServerError
 			problemDetails.Cause = "UPSTREAM_SERVER_ERROR"
@@ -265,7 +267,6 @@ func (p *Processor) HandleUeAuthPostRequest(c *gin.Context, authenticationInfo m
 	ctx, span := ueAuthTracer.Start(c.Request.Context(), "HandleUeAuthPostRequest")
 	defer span.End()
 
-	// 加一些你在 Tempo / console 想看到的欄位
 	span.SetAttributes(
 		attribute.String("ausf.supi_or_suci", authenticationInfo.SupiOrSuci),
 		attribute.String("ausf.sn", authenticationInfo.ServingNetworkName),
@@ -274,12 +275,7 @@ func (p *Processor) HandleUeAuthPostRequest(c *gin.Context, authenticationInfo m
 
 	c.Request = c.Request.WithContext(ctx)
 
-	// Bind trace context to logger
 	traceLog := logger.WithTraceContext(ctx, logger.UeAuthLog)
-
-	spanCtx := trace.SpanContextFromContext(c.Request.Context())
-	traceLog.Infof("AUSF incoming traceID: %s", spanCtx.TraceID().String())
-
 	traceLog.Infof("HandleUeAuthPostRequest")
 	p.UeAuthPostRequestProcedure(c, authenticationInfo)
 }
@@ -289,7 +285,6 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 	ctx, span := ueAuthTracer.Start(c.Request.Context(), "UeAuthPostRequestProcedure")
 	defer span.End()
 
-	// 加一些你在 Tempo / console 想看到的欄位
 	span.SetAttributes(
 		attribute.String("ausf.supi_or_suci", updateAuthenticationInfo.SupiOrSuci),
 		attribute.String("ausf.sn", updateAuthenticationInfo.ServingNetworkName),
@@ -297,12 +292,9 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 	)
 
 	c.Request = c.Request.WithContext(ctx)
-
-	// Bind trace context to logger
-	traceLog := logger.WithTraceContext(ctx, logger.UeAuthLog)
-
-	spanCtx := trace.SpanContextFromContext(c.Request.Context())
-	traceLog.Infof("AUSF incoming traceID: %s", spanCtx.TraceID().String())
+	traceUeAuthLog := logger.WithTraceContext(ctx, logger.UeAuthLog)
+	traceAuth5gAkaLog := logger.WithTraceContext(ctx, logger.Auth5gAkaLog)
+	traceAuthELog := logger.WithTraceContext(ctx, logger.AuthELog)
 
 	var responseBody models.UeAuthenticationCtx
 	var authInfoReq models.AuthenticationInfoRequest
@@ -316,12 +308,12 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 			Cause:  "SERVING_NETWORK_NOT_AUTHORIZED",
 			Status: http.StatusForbidden,
 		}
-		traceLog.Infoln("403 forbidden: serving network NOT AUTHORIZED")
+		traceUeAuthLog.Infoln("403 forbidden: serving network NOT AUTHORIZED")
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(http.StatusForbidden, problemDetails)
 		return
 	}
-	traceLog.Infoln("Serving network authorized")
+	traceUeAuthLog.Infoln("Serving network authorized")
 
 	responseBody.ServingNetworkName = snName
 	authInfoReq.ServingNetworkName = snName
@@ -330,15 +322,15 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 
 	var lastEapID uint8
 	if updateAuthenticationInfo.ResynchronizationInfo != nil {
-		logger.UeAuthLog.Warningln("Auts: ", updateAuthenticationInfo.ResynchronizationInfo.Auts)
+		traceUeAuthLog.Warningln("Auts: ", updateAuthenticationInfo.ResynchronizationInfo.Auts)
 		ausfCurrentSupi := ausf_context.GetSupiFromSuciSupiMap(supiOrSuci)
-		logger.UeAuthLog.Warningln(ausfCurrentSupi)
+		traceUeAuthLog.Warningln(ausfCurrentSupi)
 		ausfCurrentContext := ausf_context.GetAusfUeContext(ausfCurrentSupi)
-		logger.UeAuthLog.Warningln(ausfCurrentContext.Rand)
+		traceUeAuthLog.Warningln(ausfCurrentContext.Rand)
 		if updateAuthenticationInfo.ResynchronizationInfo.Rand == "" {
 			updateAuthenticationInfo.ResynchronizationInfo.Rand = ausfCurrentContext.Rand
 		}
-		logger.UeAuthLog.Warningln("Rand: ", updateAuthenticationInfo.ResynchronizationInfo.Rand)
+		traceUeAuthLog.Warningln("Rand: ", updateAuthenticationInfo.ResynchronizationInfo.Rand)
 		authInfoReq.ResynchronizationInfo = updateAuthenticationInfo.ResynchronizationInfo
 		lastEapID = ausfCurrentContext.EapID
 	}
@@ -346,11 +338,10 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 	udmUrl := p.Consumer().GetUdmUrl(self.NrfUri)
 
 	//add
-	//result, pd, err := p.Consumer().GenerateAuthDataApi(udmUrl, supiOrSuci, authInfoReq)
 	result, pd, err, _ := p.Consumer().GenerateAuthDataApi(ctx, udmUrl, supiOrSuci, authInfoReq)
 
 	if err != nil {
-		logger.UeAuthLog.Infof("GenerateAuthDataApi error: %+v", err)
+		traceUeAuthLog.Infof("GenerateAuthDataApi error: %+v", err)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(http.StatusInternalServerError, pd)
 		return
@@ -362,26 +353,25 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 	ausfUeContext.ServingNetworkName = snName
 	ausfUeContext.AuthStatus = models.AusfUeAuthenticationAuthResult_ONGOING
 	ausfUeContext.UdmUeauUrl = udmUrl
-	//add
 	ausfUeContext.TraceContext = ctx
 
 	ausf_context.AddAusfUeContextToPool(ausfUeContext)
 
-	traceLog.Infof("Add SuciSupiPair (%s, %s) to map.\n", supiOrSuci, ueid)
+	traceUeAuthLog.Infof("Add SuciSupiPair (%s, %s) to map.\n", supiOrSuci, ueid)
 	ausf_context.AddSuciSupiPairToMap(supiOrSuci, ueid)
 
 	locationURI := self.Url + factory.AusfAuthResUriPrefix + "/ue-authentications/" + supiOrSuci
 	putLink := locationURI
 	switch authInfoResult.AuthType {
 	case models.UdmUeauAuthType__5_G_AKA:
-		traceLog.Infoln("Use 5G AKA auth method")
+		traceUeAuthLog.Infoln("Use 5G AKA auth method")
 		putLink += "/5g-aka-confirmation"
 
 		// Derive HXRES* from XRES*
 		concat := authInfoResult.AuthenticationVector.Rand + authInfoResult.AuthenticationVector.XresStar
 		var hxresStarBytes []byte
 		if bytes, err := hex.DecodeString(concat); err != nil {
-			logger.Auth5gAkaLog.Errorf("decode concat error: %+v", err)
+			traceAuth5gAkaLog.Errorf("decode concat error: %+v", err)
 			problemDetails := models.ProblemDetails{
 				Title:  "Concat Decode Problem",
 				Cause:  "CONCAT_DECODE_PROBLEM",
@@ -396,13 +386,13 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 		}
 		hxresStarAll := sha256.Sum256(hxresStarBytes)
 		hxresStar := hex.EncodeToString(hxresStarAll[16:]) // last 128 bits
-		logger.WithTraceContext(ctx, logger.Auth5gAkaLog).Infof("XresStar = %x\n", authInfoResult.AuthenticationVector.XresStar)
+		traceAuth5gAkaLog.Infof("XresStar = %x\n", authInfoResult.AuthenticationVector.XresStar)
 
 		// Derive Kseaf from Kausf
 		Kausf := authInfoResult.AuthenticationVector.Kausf
 		var KausfDecode []byte
 		if ausfDecode, err := hex.DecodeString(Kausf); err != nil {
-			logger.Auth5gAkaLog.Errorf("decode Kausf failed: %+v", err)
+			traceAuth5gAkaLog.Errorf("decode Kausf failed: %+v", err)
 			problemDetails := models.ProblemDetails{
 				Title:  "Kausf Decode Problem",
 				Cause:  "KAUSF_DECODE_PROBLEM",
@@ -418,7 +408,7 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 		P0 := []byte(snName)
 		Kseaf, err := ueauth.GetKDFValue(KausfDecode, ueauth.FC_FOR_KSEAF_DERIVATION, P0, ueauth.KDFLen(P0))
 		if err != nil {
-			logger.Auth5gAkaLog.Errorf("GetKDFValue failed: %+v", err)
+			traceAuth5gAkaLog.Errorf("GetKDFValue failed: %+v", err)
 			problemDetails := models.ProblemDetails{
 				Title:  "Kseaf Derivation Problem",
 				Cause:  "KSEAF_DERIVATION_PROBLEM",
@@ -444,7 +434,7 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 		responseBody.Links = make(map[string][]models.Link)
 		responseBody.Links["5g-aka"] = []models.Link{linksValue}
 	case models.UdmUeauAuthType_EAP_AKA_PRIME:
-		logger.UeAuthLog.Infoln("Use EAP-AKA' auth method")
+		traceUeAuthLog.Infoln("Use EAP-AKA' auth method")
 		putLink += "/eap-session"
 
 		var identity string
@@ -468,14 +458,14 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 		ausfUeContext.Rand = authInfoResult.AuthenticationVector.Rand
 
 		_, K_aut, _, _, EMSK := eapAkaPrimePrf(ikPrime, ckPrime, identity)
-		logger.AuthELog.Tracef("K_aut: %x", K_aut)
+		traceAuthELog.Tracef("K_aut: %x", K_aut)
 		ausfUeContext.K_aut = hex.EncodeToString(K_aut)
 		Kausf := EMSK[0:32]
 		ausfUeContext.Kausf = hex.EncodeToString(Kausf)
 		P0 := []byte(snName)
 		Kseaf, err := ueauth.GetKDFValue(Kausf, ueauth.FC_FOR_KSEAF_DERIVATION, P0, ueauth.KDFLen(P0))
 		if err != nil {
-			logger.AuthELog.Errorf("GetKDFValue failed: %+v", err)
+			traceAuthELog.Errorf("GetKDFValue failed: %+v", err)
 		}
 		ausfUeContext.Kseaf = hex.EncodeToString(Kseaf)
 
@@ -497,27 +487,27 @@ func (p *Processor) UeAuthPostRequestProcedure(c *gin.Context, updateAuthenticat
 		eapAKAHdrBytes[0] = ausf_context.AKA_CHALLENGE_SUBTYPE
 		eapAKAHdr = string(eapAKAHdrBytes)
 		if atRandTmp, err := EapEncodeAttribute("AT_RAND", RAND); err != nil {
-			logger.AuthELog.Errorf("EAP encode RAND failed: %+v", err)
+			traceAuthELog.Errorf("EAP encode RAND failed: %+v", err)
 		} else {
 			atRand = atRandTmp
 		}
 		if atAutnTmp, err := EapEncodeAttribute("AT_AUTN", AUTN); err != nil {
-			logger.AuthELog.Errorf("EAP encode AUTN failed: %+v", err)
+			traceAuthELog.Errorf("EAP encode AUTN failed: %+v", err)
 		} else {
 			atAutn = atAutnTmp
 		}
 		if atKdfTmp, err := EapEncodeAttribute("AT_KDF", snName); err != nil {
-			logger.AuthELog.Errorf("EAP encode KDF failed: %+v", err)
+			traceAuthELog.Errorf("EAP encode KDF failed: %+v", err)
 		} else {
 			atKdf = atKdfTmp
 		}
 		if atKdfInputTmp, err := EapEncodeAttribute("AT_KDF_INPUT", snName); err != nil {
-			logger.AuthELog.Errorf("EAP encode KDF failed: %+v", err)
+			traceAuthELog.Errorf("EAP encode KDF failed: %+v", err)
 		} else {
 			atKdfInput = atKdfInputTmp
 		}
 		if atMACTmp, err := EapEncodeAttribute("AT_MAC", ""); err != nil {
-			logger.AuthELog.Errorf("EAP encode MAC failed: %+v", err)
+			traceAuthELog.Errorf("EAP encode MAC failed: %+v", err)
 		} else {
 			atMAC = atMACTmp
 		}
@@ -606,30 +596,28 @@ func (p *Processor) Auth5gAkaComfirmRequestProcedure(c *gin.Context, updateConfi
 
 	c.Request = c.Request.WithContext(ctx)
 	ausfCurrentContext.TraceContext = ctx
-
-	// Bind trace context to logger
-	traceLog := logger.WithTraceContext(ctx, logger.Auth5gAkaLog)
+	traceAuth5gAkaLog := logger.WithTraceContext(ctx, logger.Auth5gAkaLog)
 
 	// Compare the received RES* with the stored XRES*
-	traceLog.Infof("res*: %x\nXres*: %x\n", updateConfirmationData.ResStar, ausfCurrentContext.XresStar)
+	traceAuth5gAkaLog.Infof("res*: %x\nXres*: %x\n", updateConfirmationData.ResStar, ausfCurrentContext.XresStar)
 	if strings.EqualFold(updateConfirmationData.ResStar, ausfCurrentContext.XresStar) {
 		ausfCurrentContext.AuthStatus = models.AusfUeAuthenticationAuthResult_SUCCESS
 		confirmDataRsp.AuthResult = models.AusfUeAuthenticationAuthResult_SUCCESS
 		success = true
-		traceLog.Infoln("5G AKA confirmation succeeded")
+		traceAuth5gAkaLog.Infoln("5G AKA confirmation succeeded")
 		confirmDataRsp.Supi = currentSupi
 		confirmDataRsp.Kseaf = ausfCurrentContext.Kseaf
 	} else {
 		ausfCurrentContext.AuthStatus = models.AusfUeAuthenticationAuthResult_FAILURE
 		confirmDataRsp.AuthResult = models.AusfUeAuthenticationAuthResult_FAILURE
 		p.logConfirmFailureAndInformUDM(ctx, ConfirmationDataResponseID, models.AusfUeAuthenticationAuthType__5_G_AKA,
-			servingNetworkName, "5G AKA confirmation failed", ausfCurrentContext.UdmUeauUrl) //add
+			servingNetworkName, "5G AKA confirmation failed", ausfCurrentContext.UdmUeauUrl)
 	}
 
 	sendErr, spanCtxUDM := p.Consumer().SendAuthResultToUDM(ctx, currentSupi, models.UdmUeauAuthType__5_G_AKA, success,
 		servingNetworkName, ausfCurrentContext.UdmUeauUrl)
 	if sendErr != nil {
-		logger.Auth5gAkaLog.Infoln(sendErr.Error())
+		traceAuth5gAkaLog.Infoln(sendErr.Error())
 		problemDetails := models.ProblemDetails{
 			Status: http.StatusInternalServerError,
 			Cause:  "UPSTREAM_SERVER_ERROR",

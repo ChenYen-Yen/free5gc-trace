@@ -48,7 +48,6 @@ type AusfUeContext struct {
 	EapID    uint8
 	Resynced bool
 
-	//add
 	TraceContext context.Context
 }
 

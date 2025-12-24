@@ -65,8 +65,6 @@ func NewServer(ausf ServerAusf, tlsKeyLogPath string) (*Server, error) {
 func newRouter(s *Server) *gin.Engine {
 	router := logger_util.NewGinWithLogrus(logger.GinLog)
 
-	//add
-	// router.Use(metrics.InboundMetrics())
 	router.Use(
 		otelgin.Middleware("ausf-sbi-server"),
 		metrics.InboundMetrics(),
