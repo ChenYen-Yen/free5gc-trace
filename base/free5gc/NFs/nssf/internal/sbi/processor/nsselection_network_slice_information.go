@@ -86,16 +86,13 @@ func (p *Processor) NSSelectionSliceInformationGet(
 		return
 	}
 
-	//add
 	ctx := c.Request.Context()
 	tracer := otel.Tracer("nssf-processor")
 	ctx, span := tracer.Start(ctx, "NSSF NSSelectionSliceInformationGet")
 	defer span.End()
 
-	// 把新的 ctx 塞回 gin.Request，後面如果有用到 Request.Context() 就會接到這個 span
 	c.Request = c.Request.WithContext(ctx)
 
-	// 補一些跟 UE / AMF / Location 相關的 attribute，方便在 Tempo 搜尋
 	span.SetAttributes(
 		attribute.String("nf.type", string(param.NfType)),
 		attribute.String("nf.id", param.NfId),

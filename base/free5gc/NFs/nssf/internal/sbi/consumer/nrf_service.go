@@ -50,25 +50,18 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nssfCtx *nssf_
 	resourceNrfUri string, retrieveNfInstanceId string, err error,
 ) {
 	nfInstanceId := nssfCtx.NfId
-
-	//add
-	tracer := otel.Tracer("nssf-sbi")
-	ctx, span := tracer.Start(ctx, "NSSF → NRF: RegisterNFInstance")
-	span.SetAttributes(
-		attribute.String("nf.instance_id", nfInstanceId),
-	)
-	defer span.End()
-
 	profile, err := ns.buildNFProfile(nssfCtx)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to build nrf profile: %s", err.Error())
 	}
 
-	//add
+	tracer := otel.Tracer("nssf-sbi")
+	ctx, span := tracer.Start(ctx, "NSSF → NRF: RegisterNFInstance")
 	span.SetAttributes(
+		attribute.String("nf.instance_id", nfInstanceId),
 		attribute.String("nf.type", string(profile.NfType)),
 	)
-
+	defer span.End()
 	apiClient := ns.nrfNfMgmtClient
 
 	var res *NFManagement.RegisterNFInstanceResponse
@@ -87,8 +80,8 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nssfCtx *nssf_
 
 			res, err = apiClient.NFInstanceIDDocumentApi.RegisterNFInstance(ctx, req)
 			if err != nil || res == nil {
-				// TODO : add log
-				logger.ConsumerLog.Errorf("NSSF register to NRF Error[%s]", err.Error())
+				traceConsumerLog := logger.WithTraceContext(ctx, logger.ConsumerLog)
+				traceConsumerLog.Errorf("NSSF register to NRF Error[%s]", err.Error())
 				const retryInterval = 2 * time.Second
 				time.Sleep(retryInterval)
 				continue
@@ -99,7 +92,6 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nssfCtx *nssf_
 			retrieveNfInstanceId = resourceUri[strings.LastIndex(resourceUri, "/")+1:]
 			nf = res.NrfNfManagementNfProfile
 
-			//add
 			span.SetAttributes(
 				attribute.String("nrf.resource_uri", resourceUri),
 				attribute.String("nrf.base_uri", resourceNrfUri),
@@ -110,12 +102,14 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nssfCtx *nssf_
 				v, ok := nf.CustomInfo["oauth2"].(bool)
 				if ok {
 					oauth2 = v
-					logger.MainLog.Infoln("OAuth2 setting receive from NRF:", oauth2)
+					traceMainLog := logger.WithTraceContext(ctx, logger.MainLog)
+					traceMainLog.Infoln("OAuth2 setting receive from NRF:", oauth2)
 				}
 			}
 			nssf_context.GetSelf().OAuth2Required = oauth2
 			if oauth2 && nssf_context.GetSelf().NrfCertPem == "" {
-				logger.CfgLog.Error("OAuth2 enable but no nrfCertPem provided in config.")
+				traceCfgLog := logger.WithTraceContext(ctx, logger.CfgLog)
+				traceCfgLog.Error("OAuth2 enable but no nrfCertPem provided in config.")
 			}
 			finish = true
 		}
@@ -133,7 +127,6 @@ func (ns *NrfService) SendDeregisterNFInstance(nfInstanceId string) (*models.Pro
 		return pd, err
 	}
 
-	//add
 	tracer := otel.Tracer("nssf-sbi")
 	ctx, span := tracer.Start(ctx, "NSSF → NRF: DeregisterNFInstance")
 	span.SetAttributes(
