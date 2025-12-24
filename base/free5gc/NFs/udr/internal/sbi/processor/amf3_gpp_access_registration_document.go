@@ -57,7 +57,7 @@ func (p *Processor) CreateAmfContext3gppProcedure(c *gin.Context, collName strin
 }
 
 func (p *Processor) QueryAmfContext3gppProcedure(c *gin.Context, collName string, ueId string) {
-	//add
+
 	ctx, span := otel.Tracer("udr-processor").Start(
 		c.Request.Context(),
 		"UDR QueryAmfContext3gpp",
@@ -73,7 +73,8 @@ func (p *Processor) QueryAmfContext3gppProcedure(c *gin.Context, collName string
 	filter := bson.M{"ueId": ueId}
 	data, pd := p.GetDataFromDB(collName, filter)
 	if pd != nil {
-		logger.DataRepoLog.Errorf("QueryAmfContext3gppProcedure err: %s", pd.Detail)
+		traceDataRepoLog := logger.WithTraceContext(ctx, logger.DataRepoLog)
+		traceDataRepoLog.Errorf("QueryAmfContext3gppProcedure err: %s", pd.Detail)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
 	}

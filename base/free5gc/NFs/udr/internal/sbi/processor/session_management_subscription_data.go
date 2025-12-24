@@ -23,7 +23,6 @@ import (
 	"github.com/free5gc/util/metrics/sbi"
 	"github.com/free5gc/util/mongoapi"
 
-	//add
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -31,7 +30,7 @@ import (
 func (p *Processor) QuerySmDataProcedure(c *gin.Context, collName string, ueId string, servingPlmnId string,
 	singleNssai models.Snssai, dnn string,
 ) {
-	//add
+
 	ctx, span := otel.Tracer("udr-processor").Start(
 		c.Request.Context(),
 		"UDR QuerySmData",
@@ -45,6 +44,7 @@ func (p *Processor) QuerySmDataProcedure(c *gin.Context, collName string, ueId s
 	defer span.End()
 
 	c.Request = c.Request.WithContext(ctx)
+	traceDataRepoLog := logger.WithTraceContext(ctx, logger.DataRepoLog)
 
 	filter := bson.M{"ueId": ueId, "servingPlmnId": servingPlmnId}
 
@@ -66,7 +66,7 @@ func (p *Processor) QuerySmDataProcedure(c *gin.Context, collName string, ueId s
 	sessionManagementSubscriptionDatas, err := mongoapi.
 		RestfulAPIGetMany(collName, filter, mongoapi.COLLATION_STRENGTH_IGNORE_CASE)
 	if err != nil {
-		logger.DataRepoLog.Errorf("QuerySmDataProcedure err: %+v", err)
+		traceDataRepoLog.Errorf("QuerySmDataProcedure err: %+v", err)
 		pd := util.ProblemDetailsUpspecified("")
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, pd.Cause)
 		c.JSON(int(pd.Status), pd)
@@ -76,7 +76,7 @@ func (p *Processor) QuerySmDataProcedure(c *gin.Context, collName string, ueId s
 		var tmpSmData models.SessionManagementSubscriptionData
 		err := json.Unmarshal(util.MapToByte(smData), &tmpSmData)
 		if err != nil {
-			logger.DataRepoLog.Debug("SmData Unmarshal error")
+			traceDataRepoLog.Debug("SmData Unmarshal error")
 			continue
 		}
 		resp.IndividualSmSubsData = append(resp.IndividualSmSubsData, tmpSmData)

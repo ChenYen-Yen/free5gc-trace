@@ -83,7 +83,6 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nrfUri string)
 ) {
 	udrCtx := udr_context.GetSelf()
 
-	// 開一個 outbound span：UDR → NRF: RegisterNFInstance
 	tracer := otel.Tracer("udr-sbi")
 	ctx, span := tracer.Start(ctx, "UDR → NRF: RegisterNFInstance")
 	span.SetAttributes(
@@ -117,8 +116,8 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nrfUri string)
 			}
 			rsp, registerErr := client.NFInstanceIDDocumentApi.RegisterNFInstance(ctx, registerReq)
 			if registerErr != nil || rsp == nil {
-				// TODO : add log
-				logger.ConsumerLog.Errorf("UDR register to NRF Error[%s]", registerErr.Error())
+				traceConsumerLog := logger.WithTraceContext(ctx, logger.ConsumerLog)
+				traceConsumerLog.Errorf("UDR register to NRF Error[%s]", registerErr.Error())
 				time.Sleep(2 * time.Second)
 				continue
 			}
@@ -127,7 +126,6 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nrfUri string)
 			resourceNrfUri, _, _ = strings.Cut(resourceUri, "/nnrf-nfm/")
 			retrieveNfInstanceId = resourceUri[strings.LastIndex(resourceUri, "/")+1:]
 
-			//add
 			span.SetAttributes(
 				attribute.String("nrf.resource_uri", resourceUri),
 				attribute.String("nrf.assigned_instance_id", retrieveNfInstanceId),
@@ -139,12 +137,14 @@ func (ns *NrfService) SendRegisterNFInstance(ctx context.Context, nrfUri string)
 				v, ok := rsp.NrfNfManagementNfProfile.CustomInfo["oauth2"].(bool)
 				if ok {
 					oauth2 = v
-					logger.MainLog.Infoln("OAuth2 setting receive from NRF:", oauth2)
+					traceMainLog := logger.WithTraceContext(ctx, logger.MainLog)
+					traceMainLog.Infoln("OAuth2 setting receive from NRF:", oauth2)
 				}
 			}
 			udr_context.GetSelf().OAuth2Required = oauth2
 			if oauth2 && udr_context.GetSelf().NrfCertPem == "" {
-				logger.CfgLog.Error("OAuth2 enable but no nrfCertPem provided in config.")
+				traceCfgLog := logger.WithTraceContext(ctx, logger.ConsumerLog)
+				traceCfgLog.Error("OAuth2 enable but no nrfCertPem provided in config.")
 			}
 			finish = true
 		}

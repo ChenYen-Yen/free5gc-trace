@@ -193,10 +193,8 @@ func (a *UdrApp) deregisterFromNrf() {
 }
 
 func (a *UdrApp) Start() {
-	//add
-	ctx := a.ctx
 
-	// 初始化 TracerProvider（stdout 版本，之後你要換 OTLP 也容易）
+	ctx := a.ctx
 	tp, err := initTracerProvider(ctx, "udr")
 	if err != nil {
 		logger.InitLog.Warnf("Failed to init tracer provider: %+v", err)
