@@ -77,16 +77,14 @@ func validateQueryParameters(queryParameters url.Values) bool {
 }
 
 func (p *Processor) NFDiscoveryProcedure(c *gin.Context, queryParameters url.Values) {
-	//add
 	ctx := c.Request.Context()
 	tracer := otel.Tracer("nrf-processor")
 	ctx, span := tracer.Start(ctx, "NRF NFDiscoveryProcedure")
 	defer span.End()
+	traceDiscLog := logger.WithTraceContext(ctx, logger.DiscLog)
 
-	// 把新的 ctx 綁回 request，後續如果有用 Request.Context() 就會接到這個 span
 	c.Request = c.Request.WithContext(ctx)
 
-	// 補一些常用 attribute，之後在 Tempo 很好查
 	targetNfType := queryParameters.Get("target-nf-type")
 	requesterNfType := queryParameters.Get("requester-nf-type")
 	supi := queryParameters.Get("supi")
@@ -114,7 +112,7 @@ func (p *Processor) NFDiscoveryProcedure(c *gin.Context, queryParameters url.Val
 		complexQueryStruct := &models.ComplexQuery{}
 		err := json.Unmarshal([]byte(complexQuery), complexQueryStruct)
 		if err != nil {
-			logger.DiscLog.Warnln("UnMasrhal complexQuery Error: ", err)
+			traceDiscLog.Warnln("UnMasrhal complexQuery Error: ", err)
 		}
 		// Check either CNF or DNF
 		if complexQueryStruct.CnfUnits != nil && complexQueryStruct.DnfUnits != nil {
@@ -135,12 +133,12 @@ func (p *Processor) NFDiscoveryProcedure(c *gin.Context, queryParameters url.Val
 
 	// Build Query Filter
 	filter := buildFilter(queryParameters)
-	logger.DiscLog.Traceln("Query filter: ", filter)
+	traceDiscLog.Traceln("Query filter: ", filter)
 
 	// Use the filter to find documents
 	nfProfilesRaw, err := mongoapi.RestfulAPIGetMany(nrf_context.NfProfileCollName, filter)
 	if err != nil {
-		logger.DiscLog.Errorf("NFDiscoveryProcedure err: %+v", err)
+		traceDiscLog.Errorf("NFDiscoveryProcedure err: %+v", err)
 		problemDetails := &models.ProblemDetails{
 			Title:  "System failure",
 			Status: http.StatusInternalServerError,
@@ -154,7 +152,7 @@ func (p *Processor) NFDiscoveryProcedure(c *gin.Context, queryParameters url.Val
 	// nfProfile data for response
 	var nfProfilesStruct []models.NrfNfDiscoveryNfProfile
 	if err = timedecode.Decode(nfProfilesRaw, &nfProfilesStruct); err != nil {
-		logger.DiscLog.Errorf("NF Profile Raw decode error: %+v", err)
+		traceDiscLog.Errorf("NF Profile Raw decode error: %+v", err)
 		problemDetails := &models.ProblemDetails{
 			Title:  "System failure",
 			Status: http.StatusInternalServerError,
@@ -173,12 +171,12 @@ func (p *Processor) NFDiscoveryProcedure(c *gin.Context, queryParameters url.Val
 				for addressRange := range nfProfile.BsfInfo.Ipv4AddressRanges {
 					ipv4IntStart, errAtoi := strconv.Atoi(nfProfile.BsfInfo.Ipv4AddressRanges[addressRange].Start)
 					if errAtoi != nil {
-						logger.DiscLog.Warnln("ipv4IntStart Atoi Error: ", errAtoi)
+						traceDiscLog.Warnln("ipv4IntStart Atoi Error: ", errAtoi)
 					}
 					(nfProfile.BsfInfo.Ipv4AddressRanges)[addressRange].Start = nrf_context.Ipv4IntToIpv4String(int64(ipv4IntStart))
 					ipv4IntEnd, errAtoi := strconv.Atoi(nfProfile.BsfInfo.Ipv4AddressRanges[addressRange].End)
 					if errAtoi != nil {
-						logger.DiscLog.Warnln("ipv4IntEnd Atoi Error: ", errAtoi)
+						traceDiscLog.Warnln("ipv4IntEnd Atoi Error: ", errAtoi)
 					}
 					nfProfile.BsfInfo.Ipv4AddressRanges[addressRange].End = nrf_context.Ipv4IntToIpv4String(int64(ipv4IntEnd))
 				}

@@ -21,13 +21,11 @@ import (
 	timedecode "github.com/free5gc/util/mapstruct"
 	"github.com/free5gc/util/mongoapi"
 
-	//add
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 )
 
 func (p *Processor) HandleNFDeregisterRequest(c *gin.Context, nfInstanceId string) {
-	//add
 	ctx := c.Request.Context()
 	tracer := otel.Tracer("nrf-processor")
 	ctx, span := tracer.Start(ctx, "NRF NFDeregister")
@@ -424,14 +422,14 @@ func (p *Processor) NFRegisterProcedure(
 	c *gin.Context,
 	nfProfile *models.NrfNfManagementNfProfile,
 ) {
-	logger.NfmLog.Traceln("[NRF] In NFRegisterProcedure")
-	var nf models.NrfNfManagementNfProfile
-
-	//add
 	ctx := c.Request.Context()
 	tracer := otel.Tracer("nrf-processor")
 	ctx, span := tracer.Start(ctx, "NRF NFRegister")
 	defer span.End()
+	traceNfmLog := logger.WithTraceContext(ctx, logger.NfmLog)
+
+	traceNfmLog.Traceln("[NRF] In NFRegisterProcedure")
+	var nf models.NrfNfManagementNfProfile
 
 	c.Request = c.Request.WithContext(ctx)
 
@@ -451,7 +449,7 @@ func (p *Processor) NFRegisterProcedure(
 	// Marshal nf to bson
 	tmp, err := json.Marshal(nf)
 	if err != nil {
-		logger.NfmLog.Errorln("Marshal error in NFRegisterProcedure: ", err)
+		traceNfmLog.Errorln("Marshal error in NFRegisterProcedure: ", err)
 		problemDetails := &models.ProblemDetails{
 			Title:  "System failure",
 			Status: http.StatusInternalServerError,
@@ -464,7 +462,7 @@ func (p *Processor) NFRegisterProcedure(
 	putData := bson.M{}
 	err = json.Unmarshal(tmp, &putData)
 	if err != nil {
-		logger.NfmLog.Errorln("Unmarshal error in NFRegisterProcedure: ", err)
+		traceNfmLog.Errorln("Unmarshal error in NFRegisterProcedure: ", err)
 		problemDetails := &models.ProblemDetails{
 			Title:  "System failure",
 			Status: http.StatusInternalServerError,
@@ -488,7 +486,7 @@ func (p *Processor) NFRegisterProcedure(
 	// Update NF Profile case
 	existed, err := mongoapi.RestfulAPIPutOne(collName, filter, putData)
 	if err != nil {
-		logger.NfmLog.Errorf("NFRegisterProcedure err: %+v", err)
+		traceNfmLog.Errorf("NFRegisterProcedure err: %+v", err)
 		problemDetails := &models.ProblemDetails{
 			Title:  "System failure",
 			Status: http.StatusInternalServerError,
@@ -500,7 +498,7 @@ func (p *Processor) NFRegisterProcedure(
 	}
 
 	if existed {
-		logger.NfmLog.Infoln("NFRegister NfProfile Update:", nfInstanceId)
+		traceNfmLog.Infoln("NFRegister NfProfile Update:", nfInstanceId)
 		uriList := nrf_context.GetNofificationUri(&nf)
 
 		// set info for NotificationData
@@ -521,7 +519,7 @@ func (p *Processor) NFRegisterProcedure(
 		c.JSON(http.StatusOK, putData)
 		return
 	} else { // Create NF Profile case
-		logger.NfmLog.Infoln("Create NF Profile:", nfInstanceId)
+		traceNfmLog.Infoln("Create NF Profile:", nfInstanceId)
 		uriList := nrf_context.GetNofificationUri(&nf)
 		// set info for NotificationData
 		Notification_event := models.NotificationEventType_REGISTERED
@@ -544,7 +542,7 @@ func (p *Processor) NFRegisterProcedure(
 			// Generate NF's pubkey certificate with root certificate
 			err = nrf_context.SignNFCert(string(nf.NfType), nfInstanceId)
 			if err != nil {
-				logger.NfmLog.Warnln(err)
+				traceNfmLog.Warnln(err)
 			}
 		}
 		c.JSON(http.StatusCreated, putData)
