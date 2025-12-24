@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	//add
 	"context"
 
 	"go.opentelemetry.io/otel"
@@ -27,7 +26,7 @@ import (
 var tracer = otel.Tracer("free5gc/udm/processor")
 
 func (p *Processor) GetAmDataProcedure(baseCtx context.Context, c *gin.Context, supi string, plmnID string, supportedFeatures string) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -61,7 +60,7 @@ func (p *Processor) GetAmDataProcedure(baseCtx context.Context, c *gin.Context, 
 		return
 	}
 	accessAndMobilitySubscriptionDataResp, err := clientAPI.AccessAndMobilitySubscriptionDataDocumentApi.
-		QueryAmData(ctxForHTTP, &queryAmDataRequest) //add
+		QueryAmData(ctxForHTTP, &queryAmDataRequest)
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -88,7 +87,7 @@ func (p *Processor) GetAmDataProcedure(baseCtx context.Context, c *gin.Context, 
 }
 
 func (p *Processor) GetIdTranslationResultProcedure(baseCtx context.Context, c *gin.Context, gpsi string) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -119,7 +118,7 @@ func (p *Processor) GetIdTranslationResultProcedure(baseCtx context.Context, c *
 	}
 
 	idTranslationResultResp, err := clientAPI.QueryIdentityDataBySUPIOrGPSIDocumentApi.GetIdentityData(
-		ctxForHTTP, &getIdentityDataRequest) //add
+		ctxForHTTP, &getIdentityDataRequest)
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if getIdTransError, ok2 := apiErr.Model().(Nudr_DataRepository.GetIdentityDataError); ok2 {
@@ -151,14 +150,14 @@ func (p *Processor) GetIdTranslationResultProcedure(baseCtx context.Context, c *
 }
 
 func (p *Processor) GetSupiProcedure(
-	baseCtx context.Context, //add
+	baseCtx context.Context,
 	c *gin.Context,
 	supi string,
 	plmnID string,
 	dataSetNames []string,
 	supportedFeatures string,
 ) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -222,7 +221,7 @@ func (p *Processor) GetSupiProcedure(
 		p.Context().CreateAccessMobilitySubsDataForUe(supi, body)
 
 		amDataRsp, err := clientAPI.AccessAndMobilitySubscriptionDataDocumentApi.QueryAmData(
-			ctxForHTTP, &queryAmDataRequest) //add
+			ctxForHTTP, &queryAmDataRequest)
 		if err != nil {
 			apiError, ok := err.(openapi.GenericOpenAPIError)
 			if ok {
@@ -248,7 +247,7 @@ func (p *Processor) GetSupiProcedure(
 		var smfSelSubsbody models.SmfSelectionSubscriptionData
 		p.Context().CreateSmfSelectionSubsDataforUe(supi, smfSelSubsbody)
 
-		smfSelDataRsp, err := clientAPI.SMFSelectionSubscriptionDataDocumentApi.QuerySmfSelectData(ctxForHTTP, //add
+		smfSelDataRsp, err := clientAPI.SMFSelectionSubscriptionDataDocumentApi.QuerySmfSelectData(ctxForHTTP,
 			&querySmfSelectDataRequest)
 		if err != nil {
 			apiError, ok := err.(openapi.GenericOpenAPIError)
@@ -278,7 +277,7 @@ func (p *Processor) GetSupiProcedure(
 		p.Context().CreateUeContextInSmfDataforUe(supi, UeContextInSmfbody)
 
 		pdusess, err := clientAPI.SMFRegistrationsCollectionApi.QuerySmfRegList(
-			ctxForHTTP, &querySmfRegListRequest) //add
+			ctxForHTTP, &querySmfRegListRequest)
 		if err != nil {
 			apiError, ok := err.(openapi.GenericOpenAPIError)
 			if ok {
@@ -330,7 +329,7 @@ func (p *Processor) GetSupiProcedure(
 		querySmDataRequest.UeId = &supi
 		querySmDataRequest.ServingPlmnId = &plmnID
 		sessionManagementSubscriptionDataRsp, err := clientAPI.SessionManagementSubscriptionDataApi.
-			QuerySmData(ctxForHTTP, &querySmDataRequest) //add
+			QuerySmData(ctxForHTTP, &querySmDataRequest)
 		if err != nil {
 			apiError, ok := err.(openapi.GenericOpenAPIError)
 			if ok {
@@ -361,7 +360,7 @@ func (p *Processor) GetSupiProcedure(
 		queryTraceDataRequest.UeId = &supi
 		queryTraceDataRequest.ServingPlmnId = &plmnID
 		traceDataRsp, err := clientAPI.TraceDataDocumentApi.QueryTraceData(
-			ctxForHTTP, &queryTraceDataRequest) //add
+			ctxForHTTP, &queryTraceDataRequest)
 		if err != nil {
 			apiError, ok := err.(openapi.GenericOpenAPIError)
 			if ok {
@@ -392,7 +391,7 @@ func (p *Processor) GetSupiProcedure(
 }
 
 func (p *Processor) GetSharedDataProcedure(baseCtx context.Context, c *gin.Context, sharedDataIds []string, supportedFeatures string) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -422,7 +421,7 @@ func (p *Processor) GetSharedDataProcedure(baseCtx context.Context, c *gin.Conte
 	getSharedDataRequest.SupportedFeatures = &supportedFeatures
 	getSharedDataRequest.SharedDataIds = sharedDataIds
 
-	sharedDataResp, err := clientAPI.RetrievalOfSharedDataApi.GetSharedData(ctxForHTTP, //add
+	sharedDataResp, err := clientAPI.RetrievalOfSharedDataApi.GetSharedData(ctxForHTTP,
 		&getSharedDataRequest)
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
@@ -445,7 +444,7 @@ func (p *Processor) GetSharedDataProcedure(baseCtx context.Context, c *gin.Conte
 }
 
 func (p *Processor) GetSmDataProcedure(
-	baseCtx context.Context, //add
+	baseCtx context.Context,
 	c *gin.Context,
 	supi string,
 	plmnID string,
@@ -453,7 +452,7 @@ func (p *Processor) GetSmDataProcedure(
 	Snssai string,
 	supportedFeatures string,
 ) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -508,7 +507,7 @@ func (p *Processor) GetSmDataProcedure(
 	querySmDataRequest.ServingPlmnId = &plmnID
 
 	sessionManagementSubscriptionDataResp, err := clientAPI.SessionManagementSubscriptionDataApi.
-		QuerySmData(ctxForHTTP, &querySmDataRequest) //add
+		QuerySmData(ctxForHTTP, &querySmDataRequest)
 	if err != nil {
 		logger.ProcLog.Errorf("QuerySmData Error: %+v", err)
 		apiError, ok := err.(openapi.GenericOpenAPIError)
@@ -558,7 +557,7 @@ func (p *Processor) GetSmDataProcedure(
 }
 
 func (p *Processor) GetNssaiProcedure(baseCtx context.Context, c *gin.Context, supi string, plmnID string, supportedFeatures string) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -619,7 +618,7 @@ func (p *Processor) GetNssaiProcedure(baseCtx context.Context, c *gin.Context, s
 }
 
 func (p *Processor) GetSmfSelectDataProcedure(baseCtx context.Context, c *gin.Context, supi string, plmnID string, supportedFeatures string) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -658,7 +657,7 @@ func (p *Processor) GetSmfSelectDataProcedure(baseCtx context.Context, c *gin.Co
 	p.Context().CreateSmfSelectionSubsDataforUe(supi, body)
 
 	smfSelectionSubscriptionDataResp, err := clientAPI.SMFSelectionSubscriptionDataDocumentApi.
-		QuerySmfSelectData(ctxForHTTP, &querySmfSelectDataRequest) //add
+		QuerySmfSelectData(ctxForHTTP, &querySmfSelectDataRequest)
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -702,7 +701,7 @@ func (p *Processor) SubscribeToSharedDataProcedure(baseCtx context.Context, c *g
 		c.JSON(http.StatusBadRequest, problemDetails)
 		return
 	}
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -722,7 +721,7 @@ func (p *Processor) SubscribeToSharedDataProcedure(baseCtx context.Context, c *g
 	udmClientAPI := p.Consumer().GetSDMClient("subscribeToSharedData")
 
 	sdmSubscriptionResp, err := udmClientAPI.SubscriptionCreationForSharedDataApi.SubscribeToSharedData(
-		ctxForHTTP, &subscibeToShareDataRequest) //add
+		ctxForHTTP, &subscibeToShareDataRequest)
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if subToShareDataErr, ok2 := apiErr.Model().(SubscriberDataManagement.SubscribeToSharedDataError); ok2 {
@@ -748,7 +747,7 @@ func (p *Processor) SubscribeToSharedDataProcedure(baseCtx context.Context, c *g
 }
 
 func (p *Processor) SubscribeProcedure(baseCtx context.Context, c *gin.Context, sdmSubscription *models.SdmSubscription, supi string) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -774,7 +773,7 @@ func (p *Processor) SubscribeProcedure(baseCtx context.Context, c *gin.Context, 
 	createSdmSubscriptionsRequest.SdmSubscription = sdmSubscription
 	createSdmSubscriptionsRequest.UeId = &supi
 	sdmSubscriptionResp, err := clientAPI.SDMSubscriptionsCollectionApi.CreateSdmSubscriptions(
-		ctxForHTTP, &createSdmSubscriptionsRequest) //add
+		ctxForHTTP, &createSdmSubscriptionsRequest)
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -799,7 +798,7 @@ func (p *Processor) SubscribeProcedure(baseCtx context.Context, c *gin.Context, 
 }
 
 func (p *Processor) UnsubscribeForSharedDataProcedure(baseCtx context.Context, c *gin.Context, subscriptionID string) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -822,7 +821,7 @@ func (p *Processor) UnsubscribeForSharedDataProcedure(baseCtx context.Context, c
 	var unsubscribeForSharedDataRequest SubscriberDataManagement.UnsubscribeForSharedDataRequest
 	unsubscribeForSharedDataRequest.SubscriptionId = &subscriptionID
 	_, err = udmClientAPI.SubscriptionDeletionForSharedDataApi.UnsubscribeForSharedData(
-		ctxForHTTP, &unsubscribeForSharedDataRequest) //add
+		ctxForHTTP, &unsubscribeForSharedDataRequest)
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if subToShareDataErr, ok2 := apiErr.Model().(SubscriberDataManagement.UnsubscribeForSharedDataError); ok2 {
@@ -842,7 +841,7 @@ func (p *Processor) UnsubscribeForSharedDataProcedure(baseCtx context.Context, c
 }
 
 func (p *Processor) UnsubscribeProcedure(baseCtx context.Context, c *gin.Context, supi string, subscriptionID string) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -872,7 +871,7 @@ func (p *Processor) UnsubscribeProcedure(baseCtx context.Context, c *gin.Context
 	var removesdmSubscriptionRequest Nudr_DataRepository.RemovesdmSubscriptionsRequest
 	removesdmSubscriptionRequest.UeId = &supi
 	removesdmSubscriptionRequest.SubsId = &subscriptionID
-	_, err = clientAPI.SDMSubscriptionDocumentApi.RemovesdmSubscriptions(ctxForHTTP, &removesdmSubscriptionRequest) //add
+	_, err = clientAPI.SDMSubscriptionDocumentApi.RemovesdmSubscriptions(ctxForHTTP, &removesdmSubscriptionRequest)
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if removeSubErr, ok2 := apiErr.Model().(Nudr_DataRepository.RemovesdmSubscriptionsError); ok2 {
@@ -892,17 +891,16 @@ func (p *Processor) UnsubscribeProcedure(baseCtx context.Context, c *gin.Context
 }
 
 func (p *Processor) ModifyProcedure(
-	baseCtx context.Context, //add
+	baseCtx context.Context,
 	c *gin.Context,
 	sdmSubsModification *models.SdmSubsModification,
 	supi string,
 	subscriptionID string,
 ) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
-
 	_, span := tracer.Start(baseCtx, "UDM → UDR: ModifyProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
@@ -933,7 +931,7 @@ func (p *Processor) ModifyProcedure(
 	updatesdmsubscriptionsRequest.UeId = &supi
 
 	_, err = clientAPI.SDMSubscriptionDocumentApi.Updatesdmsubscriptions(
-		ctxForHTTP, &updatesdmsubscriptionsRequest) //add
+		ctxForHTTP, &updatesdmsubscriptionsRequest)
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if updateSubErr, ok2 := apiErr.Model().(Nudr_DataRepository.UpdatesdmsubscriptionsError); ok2 {
@@ -955,17 +953,16 @@ func (p *Processor) ModifyProcedure(
 // TS 29.503 5.2.2.7.3
 // Modification of a subscription to notifications of shared data change
 func (p *Processor) ModifyForSharedDataProcedure(
-	baseCtx context.Context, //add
+	baseCtx context.Context,
 	c *gin.Context,
 	sdmSubsModification *models.SdmSubsModification,
 	supi string,
 	subscriptionID string,
 ) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
-
 	_, span := tracer.Start(baseCtx, "UDM → UDR: ModifyForSharedDataProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
@@ -998,7 +995,7 @@ func (p *Processor) ModifyForSharedDataProcedure(
 	updatesdmsubscriptionsRequest.SdmSubscription = &sdmSubs
 
 	_, err = clientAPI.SDMSubscriptionDocumentApi.Updatesdmsubscriptions(
-		ctxForHTTP, &updatesdmsubscriptionsRequest) //add
+		ctxForHTTP, &updatesdmsubscriptionsRequest)
 	if err != nil {
 		if apiErr, ok := err.(openapi.GenericOpenAPIError); ok {
 			if updateShareSubErr, ok2 := apiErr.Model().(Nudr_DataRepository.UpdatesdmsubscriptionsError); ok2 {
@@ -1018,11 +1015,10 @@ func (p *Processor) ModifyForSharedDataProcedure(
 }
 
 func (p *Processor) GetTraceDataProcedure(baseCtx context.Context, c *gin.Context, supi string, plmnID string) {
-	//add
+
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
-
 	_, span := tracer.Start(baseCtx, "UDM → UDR: GetTraceDataProcedure")
 	span.SetAttributes(
 		attribute.String("ue.supi", supi),
@@ -1053,7 +1049,7 @@ func (p *Processor) GetTraceDataProcedure(baseCtx context.Context, c *gin.Contex
 	p.Context().CreateTraceDataforUe(supi, body)
 
 	traceDataRes, err := clientAPI.TraceDataDocumentApi.QueryTraceData(
-		ctxForHTTP, &queryTraceDataRequest) //add
+		ctxForHTTP, &queryTraceDataRequest)
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
@@ -1096,7 +1092,6 @@ func (p *Processor) GetUeContextInSmfDataProcedure(baseCtx context.Context, c *g
 	pduSessionMap := make(map[string]models.PduSession)
 	p.Context().CreateUeContextInSmfDataforUe(supi, body)
 
-	//add
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
@@ -1117,7 +1112,7 @@ func (p *Processor) GetUeContextInSmfDataProcedure(baseCtx context.Context, c *g
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
 
 	pdusessRes, err := clientAPI.SMFRegistrationsCollectionApi.QuerySmfRegList(
-		ctxForHTTP, &querySmfRegListRequest) //add
+		ctxForHTTP, &querySmfRegListRequest)
 	if err != nil {
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {

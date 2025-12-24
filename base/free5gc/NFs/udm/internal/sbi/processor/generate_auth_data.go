@@ -108,6 +108,7 @@ func (p *Processor) ConfirmAuthDataProcedure(
 		return
 	}
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	traceUeauLog := logger.WithTraceContext(ctxForHTTP, logger.UeauLog)
 
 	var createAuthStatusRequest Nudr_DataRepository.CreateAuthenticationStatusRequest
 	createAuthStatusRequest.AuthEvent = &authEvent
@@ -130,7 +131,7 @@ func (p *Processor) ConfirmAuthDataProcedure(
 			c.JSON(apiError.ErrorStatus, apiError.RawBody)
 			return
 		}
-		logger.UeauLog.Errorln("ConfirmAuth err:", err.Error())
+		traceUeauLog.Errorln("ConfirmAuth err:", err.Error())
 		problemDetails := openapi.ProblemDetailsSystemFailure(err.Error())
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
@@ -165,8 +166,10 @@ func (p *Processor) GenerateAuthDataProcedure(
 		return
 	}
 	ctxForHTTP := trace.ContextWithSpan(ctx, span)
+	traceUeauLog := logger.WithTraceContext(ctxForHTTP, logger.UeauLog)
+	traceProcLog := logger.WithTraceContext(ctxForHTTP, logger.ProcLog)
 
-	logger.UeauLog.Traceln("In GenerateAuthDataProcedure")
+	traceUeauLog.Traceln("In GenerateAuthDataProcedure")
 
 	response := &models.UdmUeauAuthenticationInfoResult{}
 	rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -178,13 +181,13 @@ func (p *Processor) GenerateAuthDataProcedure(
 			Detail: err.Error(),
 		}
 
-		logger.UeauLog.Errorln("suciToSupi error: ", err.Error())
+		traceUeauLog.Errorln("suciToSupi error: ", err.Error())
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
 	}
 
-	logger.UeauLog.Tracef("supi conversion => [%s]", supi)
+	traceUeauLog.Tracef("supi conversion => [%s]", supi)
 
 	client, err := p.Consumer().CreateUDMClientToUDR(supi)
 	if err != nil {
@@ -198,16 +201,16 @@ func (p *Processor) GenerateAuthDataProcedure(
 
 	authSubs, err := client.AuthenticationDataDocumentApi.QueryAuthSubsData(ctxForHTTP, &queryAuthSubsDataRequest) //add
 	if err != nil {
-		logger.ProcLog.Errorf("Error on QueryAuthSubsData: %+v", err)
+		traceProcLog.Errorf("Error on QueryAuthSubsData: %+v", err)
 		apiError, ok := err.(openapi.GenericOpenAPIError)
 		if ok {
 			c.Set(sbi.IN_PB_DETAILS_CTX_STR, http.StatusText(apiError.ErrorStatus))
 			c.JSON(apiError.ErrorStatus, apiError.RawBody)
 			switch apiError.ErrorStatus {
 			case http.StatusNotFound:
-				logger.UeauLog.Warnf("Return from UDR QueryAuthSubsData error")
+				traceUeauLog.Warnf("Return from UDR QueryAuthSubsData error")
 			default:
-				logger.UeauLog.Errorln("Return from UDR QueryAuthSubsData error")
+				traceUeauLog.Errorln("Return from UDR QueryAuthSubsData error")
 			}
 			return
 		}
@@ -231,7 +234,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 		if len(kStr) == keyStrLen {
 			k, err = hex.DecodeString(kStr)
 			if err != nil {
-				logger.UeauLog.Errorln("err:", err)
+				traceUeauLog.Errorln("err:", err)
 			}
 		} else {
 			problemDetails := &models.ProblemDetails{
@@ -240,7 +243,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 				Detail: "len(kStr) != keyStrLen",
 			}
 
-			logger.UeauLog.Errorln("kStr length is ", len(kStr))
+			traceUeauLog.Errorln("kStr length is ", len(kStr))
 			c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 			c.JSON(int(problemDetails.Status), problemDetails)
 			return
@@ -252,7 +255,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 			Detail: "EncPermanentKey == ''",
 		}
 
-		logger.UeauLog.Errorln("Nil PermanentKey")
+		traceUeauLog.Errorln("Nil PermanentKey")
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
@@ -263,15 +266,15 @@ func (p *Processor) GenerateAuthDataProcedure(
 		if len(opcStr) == opcStrLen {
 			opc, err = hex.DecodeString(opcStr)
 			if err != nil {
-				logger.UeauLog.Errorln("err:", err)
+				traceUeauLog.Errorln("err:", err)
 			} else {
 				hasOPC = true
 			}
 		} else {
-			logger.UeauLog.Errorln("opcStr length is ", len(opcStr))
+			traceUeauLog.Errorln("opcStr length is ", len(opcStr))
 		}
 	} else {
-		logger.UeauLog.Infoln("Nil Opc")
+		traceUeauLog.Infoln("Nil Opc")
 	}
 
 	if !hasOPC {
@@ -285,7 +288,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 	}
 
 	sqnStr := p.strictHex(authSubs.AuthenticationSubscription.SequenceNumber.Sqn, 12)
-	logger.UeauLog.Traceln("sqnStr", sqnStr)
+	traceUeauLog.Traceln("sqnStr", sqnStr)
 	sqn, err := hex.DecodeString(sqnStr)
 	if err != nil {
 		problemDetails := &models.ProblemDetails{
@@ -294,13 +297,13 @@ func (p *Processor) GenerateAuthDataProcedure(
 			Detail: err.Error(),
 		}
 
-		logger.UeauLog.Errorln("err:", err)
+		traceUeauLog.Errorln("err:", err)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
 	}
 
-	logger.UeauLog.Tracef("K=[%x], sqn=[%x], OP=[%x], OPC=[%x]", k, sqn, op, opc)
+	traceUeauLog.Tracef("K=[%x], sqn=[%x], OP=[%x], OPC=[%x]", k, sqn, op, opc)
 
 	RAND := make([]byte, 16)
 	_, err = cryptoRand.Read(RAND)
@@ -311,14 +314,14 @@ func (p *Processor) GenerateAuthDataProcedure(
 			Detail: err.Error(),
 		}
 
-		logger.UeauLog.Errorln("err:", err)
+		traceUeauLog.Errorln("err:", err)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
 	}
 
 	amfStr := p.strictHex(authSubs.AuthenticationSubscription.AuthenticationManagementField, 4)
-	logger.UeauLog.Traceln("amfStr", amfStr)
+	traceUeauLog.Traceln("amfStr", amfStr)
 	AMF, err := hex.DecodeString(amfStr)
 	if err != nil {
 		problemDetails := &models.ProblemDetails{
@@ -327,18 +330,17 @@ func (p *Processor) GenerateAuthDataProcedure(
 			Detail: err.Error(),
 		}
 
-		logger.UeauLog.Errorln("err:", err)
+		traceUeauLog.Errorln("err:", err)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
 	}
 
-	logger.UeauLog.Tracef("RAND=[%x], AMF=[%x]", RAND, AMF)
+	traceUeauLog.Tracef("RAND=[%x], AMF=[%x]", RAND, AMF)
 
 	// re-synchronization
 	if authInfoRequest.ResynchronizationInfo != nil {
-		logger.UeauLog.Infof("Authentication re-synchronization")
-
+		traceUeauLog.Infof("Authentication re-synchronization")
 		Auts, deCodeErr := hex.DecodeString(authInfoRequest.ResynchronizationInfo.Auts)
 		if deCodeErr != nil {
 			problemDetails := &models.ProblemDetails{
@@ -347,7 +349,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 				Detail: deCodeErr.Error(),
 			}
 
-			logger.UeauLog.Errorln("err:", deCodeErr)
+			traceUeauLog.Errorln("err:", deCodeErr)
 			c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 			c.JSON(int(problemDetails.Status), problemDetails)
 			return
@@ -361,7 +363,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 				Detail: deCodeErr.Error(),
 			}
 
-			logger.UeauLog.Errorln("err:", deCodeErr)
+			traceUeauLog.Errorln("err:", deCodeErr)
 			c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 			c.JSON(int(problemDetails.Status), problemDetails)
 			return
@@ -377,7 +379,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 					Detail: err.Error(),
 				}
 
-				logger.UeauLog.Errorln("err:", err)
+				traceUeauLog.Errorln("err:", err)
 				c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 				c.JSON(int(problemDetails.Status), problemDetails)
 				return
@@ -386,7 +388,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 			// increment sqn authSubs.SequenceNumber
 			bigSQN := big.NewInt(0)
 			sqnStr = hex.EncodeToString(SQNms)
-			logger.UeauLog.Tracef("SQNstr=[%s]", sqnStr)
+			traceUeauLog.Tracef("SQNstr=[%s]", sqnStr)
 			bigSQN.SetString(sqnStr, 16)
 
 			bigInc := big.NewInt(ind + 1)
@@ -397,10 +399,10 @@ func (p *Processor) GenerateAuthDataProcedure(
 			sqnStr = fmt.Sprintf("%x", bigSQN)
 			sqnStr = p.strictHex(sqnStr, 12)
 		} else {
-			logger.UeauLog.Errorf("Re-Sync MAC failed for UE with identity supiOrSuci=[%s], resolvedSupi=[%s]", supiOrSuci, supi)
-			logger.UeauLog.Errorln("MACS ", macS)
-			logger.UeauLog.Errorln("Auts[6:] ", Auts[6:])
-			logger.UeauLog.Errorln("Sqn ", SQNms)
+			traceUeauLog.Errorf("Re-Sync MAC failed for UE with identity supiOrSuci=[%s], resolvedSupi=[%s]", supiOrSuci, supi)
+			traceUeauLog.Errorln("MACS ", macS)
+			traceUeauLog.Errorln("Auts[6:] ", Auts[6:])
+			traceUeauLog.Errorln("Sqn ", SQNms)
 			problemDetails := &models.ProblemDetails{
 				Status: http.StatusForbidden,
 				Cause:  "modification is rejected",
@@ -421,7 +423,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 			Detail: err.Error(),
 		}
 
-		logger.UeauLog.Errorln("err:", err)
+		traceUeauLog.Errorln("err:", err)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
@@ -444,7 +446,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 		},
 	}
 
-	logger.ProcLog.Infoln("ModifyAuthenticationSubscriptionRequest: ", patchItemArray)
+	traceProcLog.Infoln("ModifyAuthenticationSubscriptionRequest: ", patchItemArray)
 
 	var modifyAuthenticationSubscriptionRequest Nudr_DataRepository.ModifyAuthenticationSubscriptionRequest
 	modifyAuthenticationSubscriptionRequest.UeId = &supi
@@ -458,7 +460,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 			Detail: err.Error(),
 		}
 
-		logger.UeauLog.Errorln("update sqn error:", err)
+		traceUeauLog.Errorln("update sqn error:", err)
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
 		c.JSON(int(problemDetails.Status), problemDetails)
 		return
@@ -473,27 +475,27 @@ func (p *Processor) GenerateAuthDataProcedure(
 	// Generate macA, macS
 	err = util.MilenageF1(opc, k, RAND, sqn, AMF, macA, macS)
 	if err != nil {
-		logger.UeauLog.Errorln("milenage F1 err:", err)
+		traceUeauLog.Errorln("milenage F1 err:", err)
 	}
 
 	// Generate RES, CK, IK, AK, AKstar
 	// RES == XRES (expected RES) for server
 	err = util.MilenageF2345(opc, k, RAND, RES, CK, IK, AK, AKstar)
 	if err != nil {
-		logger.UeauLog.Errorln("milenage F2345 err:", err)
+		traceUeauLog.Errorln("milenage F2345 err:", err)
 	}
-	logger.UeauLog.Tracef("milenage RES=[%s]", hex.EncodeToString(RES))
+	traceUeauLog.Tracef("milenage RES=[%s]", hex.EncodeToString(RES))
 
 	// Generate AUTN
-	logger.UeauLog.Tracef("SQN=[%x], AK=[%x]", sqn, AK)
-	logger.UeauLog.Tracef("AMF=[%x], macA=[%x]", AMF, macA)
+	traceUeauLog.Tracef("SQN=[%x], AK=[%x]", sqn, AK)
+	traceUeauLog.Tracef("AMF=[%x], macA=[%x]", AMF, macA)
 	SQNxorAK := make([]byte, 6)
 	for i := 0; i < len(sqn); i++ {
 		SQNxorAK[i] = sqn[i] ^ AK[i]
 	}
-	logger.UeauLog.Tracef("SQN xor AK=[%x]", SQNxorAK)
+	traceUeauLog.Tracef("SQN xor AK=[%x]", SQNxorAK)
 	AUTN := append(append(SQNxorAK, AMF...), macA...)
-	logger.UeauLog.Tracef("AUTN=[%x]", AUTN)
+	traceUeauLog.Tracef("AUTN=[%x]", AUTN)
 
 	var av models.AuthenticationVector
 	if authSubs.AuthenticationSubscription.AuthenticationMethod == models.AuthMethod__5_G_AKA {
@@ -509,10 +511,10 @@ func (p *Processor) GenerateAuthDataProcedure(
 		kdfValForXresStar, err := ueauth.GetKDFValue(
 			key, FC, P0, ueauth.KDFLen(P0), P1, ueauth.KDFLen(P1), P2, ueauth.KDFLen(P2))
 		if err != nil {
-			logger.UeauLog.Errorf("Get kdfValForXresStar err: %+v", err)
+			traceUeauLog.Errorf("Get kdfValForXresStar err: %+v", err)
 		}
 		xresStar := kdfValForXresStar[len(kdfValForXresStar)/2:]
-		logger.UeauLog.Tracef("xresStar=[%x]", xresStar)
+		traceUeauLog.Tracef("xresStar=[%x]", xresStar)
 
 		// derive Kausf
 		FC = ueauth.FC_FOR_KAUSF_DERIVATION
@@ -520,9 +522,9 @@ func (p *Processor) GenerateAuthDataProcedure(
 		P1 = SQNxorAK
 		kdfValForKausf, err := ueauth.GetKDFValue(key, FC, P0, ueauth.KDFLen(P0), P1, ueauth.KDFLen(P1))
 		if err != nil {
-			logger.UeauLog.Errorf("Get kdfValForKausf err: %+v", err)
+			traceUeauLog.Errorf("Get kdfValForKausf err: %+v", err)
 		}
-		logger.UeauLog.Tracef("Kausf=[%x]", kdfValForKausf)
+		traceUeauLog.Tracef("Kausf=[%x]", kdfValForKausf)
 
 		// Fill in rand, xresStar, autn, kausf
 		av.Rand = hex.EncodeToString(RAND)
@@ -539,9 +541,9 @@ func (p *Processor) GenerateAuthDataProcedure(
 		P1 := SQNxorAK
 		kdfVal, err := ueauth.GetKDFValue(key, FC, P0, ueauth.KDFLen(P0), P1, ueauth.KDFLen(P1))
 		if err != nil {
-			logger.UeauLog.Errorf("Get kdfVal err: %+v", err)
+			traceUeauLog.Errorf("Get kdfVal err: %+v", err)
 		}
-		logger.UeauLog.Tracef("kdfVal=[%x] (len=%d)", kdfVal, len(kdfVal))
+		traceUeauLog.Tracef("kdfVal=[%x] (len=%d)", kdfVal, len(kdfVal))
 
 		// For TS 35.208 test set 19 & RFC 5448 test vector 1
 		// CK': 0093 962d 0dd8 4aa5 684b 045c 9edf fa04
@@ -549,7 +551,7 @@ func (p *Processor) GenerateAuthDataProcedure(
 
 		ckPrime := kdfVal[:len(kdfVal)/2]
 		ikPrime := kdfVal[len(kdfVal)/2:]
-		logger.UeauLog.Tracef("ckPrime=[%x], kPrime=[%x]", ckPrime, ikPrime)
+		traceUeauLog.Tracef("ckPrime=[%x], kPrime=[%x]", ckPrime, ikPrime)
 
 		// Fill in rand, xres, autn, ckPrime, ikPrime
 		av.Rand = hex.EncodeToString(RAND)
